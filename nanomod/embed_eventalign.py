@@ -1,81 +1,14 @@
-#!/usr/bin/env python
-
-# python embed_eventalign.py -e ~/python/rnnlib_examples/ont_classification/data/ecoli_er2925.mutant.lucattini.100516.eventalign -f ~/python/rnnlib_examples/ont_classification/data/ecoli_er2925.mutant.lucattini.100516.fasta -k 3 -o eventalign
-
-from __future__ import print_function
-import Bio
 from Bio import SeqIO
 import os
-import sys
 import pysam
-from optparse import OptionParser
 import h5py
 import numpy as np
 import csv
 from numpy.lib.recfunctions import append_fields
-from shutil import copyfile, rmtree
 from multiprocessing import Pool, cpu_count
 
-def parseArgs(argv):
-	
-	#command line options
-	parser = OptionParser()
-	parser.add_option("-e", "--eventalign", dest="eventalign")
-	parser.add_option("-f","--fasta",dest="fasta")
-	parser.add_option("-g", "--genome", default="../../rnnlib_examples/ont_classification/data/ecoli_k12.fasta", dest="genome")
-	parser.add_option("-o", "--out-dir", dest="outDir")
-	parser.add_option("-n", "--num-reads", type=int, default=-1, dest="numReads")
-	parser.add_option("-t", "--threads", type=int, default=cpu_count(), dest="threads")
-	parser.add_option("--force", default=False, action="store_true", dest="force")
-	parser.add_option("--val-fraction", type=float, default=0.05, dest="valFraction")
-	parser.add_option("--methyl", default=False, action="store_true",dest="methyl")
-	parser.add_option("--temp-dir", default="/tmp/embed_eventalign", dest="tempDir")
-	
-	#parse command line options
-	(options, args) = parser.parse_args()
-	
-	# Making sure all mandatory options appeared.
-	mandatories = ["eventalign", "fasta", "genome", "outDir"]
-	for m in mandatories:
-		if not options.__dict__[m]:
-			print("mandatory option %s is missing" % m)
-			parser.print_help()
-			exit(-1)
-	
-	return (options, args)
-
-def loadRef(fasta):
-	refs = dict()
-	readsPath = '/'.join(fasta.split('/')[:-1])
-	handle = open(fasta, "rU")
-	for record in SeqIO.parse(handle, "fasta"):
-		#print "%s with %d bases\n" % (record.id, len(record.seq))
-		refs[record.id] = '/'.join([readsPath, record.description.split(' ')[-1]])
-	handle.close()
-	return refs
-
-def loadGenome(filename):
-	genome = {}
-	handle = open(filename, "rU")
-	for record in SeqIO.parse(handle, "fasta"):
-		genome[record.id] = record
-	return genome
-	
-def reverseComplement(seq):
-	# reverse
-	seq = seq[::-1]	
-	# complement
-	# from http://stackoverflow.com/questions/6116978/python-replace-multiple-strings
-	# in order to avoid double changes, use symbols first
-	repls = ('A', '1'), ('T', '2'), ('C', '3'), ('G', '4')
-	seq = reduce(lambda a, kv: a.replace(*kv), repls, seq)
-	repls = ('1', 'T'), ('2', 'A'), ('3', 'G'), ('4', 'C')
-	return reduce(lambda a, kv: a.replace(*kv), repls, seq)
-
-def methylateSeq(seq):
-	# simply replacing CG with MG leaves out sequences ending in C that could be methylated
-	# as a result, we can't use the last base of the sequence effectively	
-	return seq.replace("CG","MG")
+from seq_tools import *
+from utils import log
 
 def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer):
 
@@ -87,7 +20,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, ch
 	newEvents = events[names]
 	
 	filename = fast5Path.split('/')[-1]
-	newPath = '/'.join([options.outDir, filename])
+	newPath = os.path.join(options.outPrefix, filename)
 	copyfile(fast5Path, newPath)
 	with h5py.File(newPath,'r+') as fast5:
 		analysesGroup = fast5.get("Analyses")
@@ -126,7 +59,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, ch
 	else:
 		return "train"
 
-def embedEventalign(options, idx, fast5Path):
+def processRead(options, idx, fast5Path):
 	
 	fast5File = fast5Path.split('/')[-1]
 	eventalign = np.load(os.path.join(options.tempDir, fast5File + ".npy"))
@@ -137,8 +70,8 @@ def embedEventalign(options, idx, fast5Path):
 	try:
 		fast5 = h5py.File(fast5Path, 'r')
 	except IOError:
-		print("downloads directory not found")
-		exit(-1)
+		log("Failed to read {}".format(fast5Path), 0, options)
+		return ["",""]
 		
 	# r7.3 for now
 	events = np.array(fast5.get("Analyses/Basecall_1D_000/BaseCalled_template/Events"))
@@ -200,14 +133,14 @@ def embedEventalign(options, idx, fast5Path):
 		trainType = writeFast5(options, newEvents, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer)
 		return [fast5File, trainType]
 	except:
-		print("Failed to write " + fast5File)
+		log("Failed to write " + fast5File, 0, options)
 		return ["",""]
 
-def writeTempFiles(options, refs):
+def writeTempFiles(options, eventalign, refs):
 	if not os.path.exists(options.tempDir):
 		os.makedirs(options.tempDir)
 	
-	with open(options.eventalign) as tsv:
+	with open(eventalign) as tsv:
 		
 		# open file
 		reader = csv.reader(tsv, delimiter="\t")
@@ -237,8 +170,11 @@ def writeTempFiles(options, refs):
 				continue
 			elif line[idx['read_name']] != current_read_name:
 				if tmp is not None and tmp != []:
-					np.save(filename,tmp)
-				n += 1
+					try:
+						np.save(filename,tmp)
+						n += 1
+					except IOError:
+						log("Failed to write " + filename, 0, options)
 				if options.numReads != -1 and n >= options.numReads:
 					# we're done!
 					break
@@ -250,16 +186,16 @@ def writeTempFiles(options, refs):
 					fast5Path = refs[current_read_name]
 				except KeyError:
 					skip = True
-					print(fast5Path + " not found")
+					log(fast5Path + " not found", 0, options)
 					continue
 				fast5Name = fast5Path.split('/')[-1]
 				if line[idx['strand']] != 't':
 					# not template, skip
 					skip=True
 					continue
-				outfile = '/'.join([options.outDir, fast5Name])
+				outfile = '/'.join([options.outPrefix, fast5Name])
 				if (not options.force) and os.path.isfile(outfile):
-					print(outfile + " already exists. Use --force to recompute.")
+					log(outfile + " already exists. Use --force to recompute.", 0, options)
 					skip=True
 					premadeFilenames.append(fast5Name)
 					continue
@@ -276,8 +212,8 @@ def writeTempFiles(options, refs):
 		
 	return filenames, idx, premadeFilenames
 
-def embed_eventalign_wrapper(args):
-   return embedEventalign(*args)
+def processReadWrapper(args):
+   return processRead(*args)
 
 def appendPremade(options, filenames, trainData):
 	for fn in filenames:
@@ -289,8 +225,8 @@ def appendPremade(options, filenames, trainData):
 	return trainData
 
 def writeTrainfiles(options, trainData):
-	trainFilename = options.outDir + "/train.txt"
-	valFilename = options.outDir + "/val.txt"
+	trainFilename = options.outPrefix + ".train.txt"
+	valFilename = options.outPrefix + ".val.txt"
 	
 	with open(trainFilename, 'w') as trainFile, open(valFilename, 'w') as valFile:
 
@@ -303,20 +239,15 @@ def writeTrainfiles(options, trainData):
 				trainFile.write(line[0] + "\n")
 			elif line[1] == 'val':
 				valFile.write(line[0] + "\n")
-				
-def cleanTempDir(options):
-	rmtree(options.tempDir)
 
-def run(argv):
-	options, args = parseArgs(argv)
-	refs = loadRef(options.fasta)
+def embedEventalign(options, fasta, eventalign):
+	log("Loading fast5 names and references...", 1, options)
+	refs = loadRef(fasta)
 	options.genome = loadGenome(options.genome)
-	filenames, idx, premadeFilenames = writeTempFiles(options, refs)
+	log("Splitting eventalign into separate files...", 1, options)
+	filenames, idx, premadeFilenames = writeTempFiles(options, eventalign, refs)
 	pool = Pool(options.threads)
-	trainData = pool.map(embed_eventalign_wrapper, [[options, idx, i] for i in filenames])
+	log("Embedding labels into fast5 files...", 1, options)
+	trainData = pool.map(processReadWrapper, [[options, idx, i] for i in filenames])
 	trainData = appendPremade(options, premadeFilenames, trainData)
 	writeTrainfiles(options, trainData)
-	cleanTempDir(options)
-
-if __name__ == "__main__":
-	run(sys.argv)
