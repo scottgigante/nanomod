@@ -135,13 +135,13 @@ def processRead(options, idx, fast5Path):
 		newEvents["kmer"][int(line[idx['event_index']])] = seq
 	
 	fast5.close()
-	try:
-		trainType = writeFast5(options, newEvents, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer)
-		return [fast5File, trainType]
-	except Exception as e:
-		log("Failed to write " + fast5File, 0, options)
-		log(str(e), 0, options)
-		return ["",""]
+	#try:
+	trainType = writeFast5(options, newEvents, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer)
+	return [fast5File, trainType]
+	#except Exception as e:
+#		log("Failed to write " + fast5File, 0, options)
+#		log(str(e), 0, options)
+#		return ["",""]
 
 def writeTempFiles(options, eventalign, refs):
 	if not os.path.exists(options.tempDir):
@@ -180,8 +180,8 @@ def writeTempFiles(options, eventalign, refs):
 					try:
 						np.save(filename,tmp)
 						n += 1
-					except IOError:
-						log("Failed to write " + filename, 0, options)
+					except IOError as e:
+						log("Failed to write {}.npy: {}".format(filename, e), 0, options)
 				if options.numReads != -1 and n >= options.numReads:
 					# we're done!
 					break
@@ -201,7 +201,7 @@ def writeTempFiles(options, eventalign, refs):
 					skip=True
 					continue
 				
-				outfile = getOutfile(fast5name, options)
+				outfile = getOutfile(fast5Name, options)
 				filename = os.path.join(options.tempDir, fast5Name)
 				if (not options.force) and os.path.isfile(outfile):
 					log(outfile + " already exists. Use --force to recompute.", 0, options)
@@ -212,11 +212,13 @@ def writeTempFiles(options, eventalign, refs):
 					log("{}.npy already exists. Use --force to recompute.".format(filename), 2, options)
 					skip=True
 					filenames.append(fast5Path)
+					assert(tmp == [])
 					continue
 				
 				filenames.append(fast5Path)
 				skip=False
 			
+			assert(skip==False)
 			tmp.append(line)
 		
 		# last one gets missed

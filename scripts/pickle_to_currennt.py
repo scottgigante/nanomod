@@ -26,6 +26,7 @@ def parse_layer_feedforward(layer, layer_type, idx):
 	weights = dict()
 	weights['input'] = layer.W.transpose().flatten()
 	weights['bias'] = layer.b
+	weights['internal'] = np.ndarray(shape=(0,0))
 	return l, weights
 
 
@@ -42,11 +43,17 @@ def parse_layer_feedforward_linear(size, weights):
 
 
 def parse_layer_softmax(layer, layer_type, idx):
-    return parse_layer_feedforward(layer, layer_type, idx)
+	size = layer.out_size - 1
+	l = get_layer_dict(layer_type, idx, size)
+	weights = dict()
+	weights['input'] = layer.W.transpose()[:-1].flatten()
+	weights['bias'] = layer.b[:-1]
+	weights['internal'] = np.ndarray(shape=(0,0))
+	return l, weights
 
 
 def parse_layer_multiclass(in_network):
-	size = len(in_network.meta['kmers'])
+	size = len(in_network.meta['kmers']) - 1 # XXXXXX isn't a real kmer
 	layer = { "name": "postoutput",
 			  "type": "multiclass_classification",
 			  "size": size }
@@ -145,7 +152,8 @@ def get_layer_name(layer_type, idx):
 def get_layer_dict(layer_type, idx, size):
 	return { "name" : "{}_{}".format(layer_type, idx),
 			 "type" : layer_type,
-			 "size" : size }
+			 "size" : size,
+			 "bias" : 1.0 } # why bias 1?
 
 def numpy_to_network(in_network):
     """Transform a numpy representation of a network into a json
