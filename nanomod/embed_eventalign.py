@@ -6,6 +6,7 @@ import numpy as np
 import csv
 from numpy.lib.recfunctions import append_fields
 from multiprocessing import Pool, cpu_count
+from shutil import copyfile
 
 from seq_tools import *
 from utils import log
@@ -17,7 +18,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, ch
 	# remove move field - nanonet adds it
 	names = list(events.dtype.names)
 	names.remove("move")
-	newEvents = events[names]
+	newEvents = events[names].copy()
 	
 	filename = fast5Path.split('/')[-1]
 	newPath = os.path.join(options.outPrefix, filename)
@@ -132,8 +133,9 @@ def processRead(options, idx, fast5Path):
 	try:
 		trainType = writeFast5(options, newEvents, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer)
 		return [fast5File, trainType]
-	except:
+	except Exception as e:
 		log("Failed to write " + fast5File, 0, options)
+		log(str(e), 0, options)
 		return ["",""]
 
 def writeTempFiles(options, eventalign, refs):
@@ -193,14 +195,20 @@ def writeTempFiles(options, eventalign, refs):
 					# not template, skip
 					skip=True
 					continue
+				
 				outfile = '/'.join([options.outPrefix, fast5Name])
+				filename = os.path.join(options.tempDir, fast5Name)
 				if (not options.force) and os.path.isfile(outfile):
 					log(outfile + " already exists. Use --force to recompute.", 0, options)
 					skip=True
 					premadeFilenames.append(fast5Name)
 					continue
+				elif (not options.force) and os.path.isfile(filename + ".npy"):
+					log("{}.npy already exists. Use --force to recompute.".format(filename), 2, options)
+					skip=True
+					filenames.append(fast5Path)
+					continue
 				
-				filename = os.path.join(options.tempDir, fast5Name)
 				filenames.append(fast5Path)
 				skip=False
 			

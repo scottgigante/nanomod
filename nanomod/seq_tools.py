@@ -1,4 +1,5 @@
 from Bio import SeqIO
+import os
 
 def loadRef(fasta):
 	refs = dict()
@@ -6,7 +7,9 @@ def loadRef(fasta):
 	handle = open(fasta, "rU")
 	for record in SeqIO.parse(handle, "fasta"):
 		#print "%s with %d bases\n" % (record.id, len(record.seq))
-		refs[record.id] = '/'.join([readsPath, record.description.split(' ')[-1]])
+		fast5Path = record.description.split(' ')[-1]
+		refs[record.id] = (fast5Path if os.path.isabs(fast5Path) else 
+				os.path.join([readsPath, fast5Path]))
 	handle.close()
 	return refs
 
