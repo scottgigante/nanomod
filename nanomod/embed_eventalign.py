@@ -9,7 +9,12 @@ from multiprocessing import Pool, cpu_count
 from shutil import copyfile
 
 from seq_tools import *
-from utils import log
+from utils import log, makeDir
+
+__outdir_name__ = "nanomod"
+
+def getOutfile(fast5, options):
+	return os.path.join(options.outPrefix, __outdir_name__, fast5)
 
 def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer):
 
@@ -21,7 +26,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, ch
 	newEvents = events[names].copy()
 	
 	filename = fast5Path.split('/')[-1]
-	newPath = os.path.join(options.outPrefix, filename)
+	newPath = getOutfile(filename, options)
 	copyfile(fast5Path, newPath)
 	with h5py.File(newPath,'r+') as fast5:
 		analysesGroup = fast5.get("Analyses")
@@ -196,7 +201,7 @@ def writeTempFiles(options, eventalign, refs):
 					skip=True
 					continue
 				
-				outfile = '/'.join([options.outPrefix, fast5Name])
+				outfile = getOutfile(fast5name, options)
 				filename = os.path.join(options.tempDir, fast5Name)
 				if (not options.force) and os.path.isfile(outfile):
 					log(outfile + " already exists. Use --force to recompute.", 0, options)
@@ -249,6 +254,7 @@ def writeTrainfiles(options, trainData):
 				valFile.write(line[0] + "\n")
 
 def embedEventalign(options, fasta, eventalign):
+	makeDir(os.path.join(options.outPrefix, __outdir_name__))
 	log("Loading fast5 names and references...", 1, options)
 	refs = loadRef(fasta)
 	options.genome = loadGenome(options.genome)
