@@ -236,7 +236,7 @@ def appendPremade(options, filenames, trainData):
 			trainType="val"
 		else:
 			trainType="train"
-		trainData.append([trainType, fn])
+		trainData.append([fn, trainType])
 	return trainData
 
 def writeTrainfiles(options, trainData):
@@ -263,7 +263,11 @@ def embedEventalign(options, fasta, eventalign):
 	log("Splitting eventalign into separate files...", 1, options)
 	filenames, idx, premadeFilenames = writeTempFiles(options, eventalign, refs)
 	pool = Pool(options.threads)
-	log("Embedding labels into fast5 files...", 1, options)
-	trainData = pool.map(processReadWrapper, [[options, idx, i] for i in filenames])
+	log("Embedding labels into {} fast5 files...".format(len(filenames)), 1,
+			options)
+	trainData = pool.map(processReadWrapper, 
+			[[options, idx, i] for i in filenames])
+	log(("Adding data for {} premade fast5" 
+			"files...").format(len(premadeFilenames)), 1, options)
 	trainData = appendPremade(options, premadeFilenames, trainData)
 	writeTrainfiles(options, trainData)
