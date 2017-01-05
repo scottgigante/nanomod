@@ -2,6 +2,8 @@
 
 # Runs Scott Gigante's Nanomod.
 
+# python -m nanomod -r data/Nott_R9_run2/downloads/pass/ -g data/ecoli_k12.fasta -o data/Nott_R9_run2 -v --temp-dir temp; python -m nanomod -r data/2016_09_11_E_COLI_MTHYLTD_R9/reads/downloads/pass/ -g data/ecoli_k12.fasta -o data/2016_09_11_E_COLI_MTHYLTD_R9 -v --temp-dir temp --methyl; python -m nanomod -r data/2016_09_18_E_COLI_NON_MTHYLTD_R9/reads/downloads/pass/ -g data/ecoli_k12.fasta -o data/2016_09_18_E_COLI_NON_MTHYLTD_R9 -v --temp-dir temp 
+
 import argparse
 import subprocess
 import os
@@ -10,7 +12,7 @@ from multiprocessing import cpu_count
 import tempfile
 import shutil
 
-from utils import log, makeDir
+from utils import log, makeDir, callSubprocess
 from build_eventalign import buildEventalign
 from embed_eventalign import embedEventalign
 
@@ -95,6 +97,8 @@ def parseArgs(argv):
 			help="limit the number of reads to be computed")
 	parser.add_argument("--val-fraction", type=float, default=0.05, 
 			dest="valFraction", help="fraction of data used for validation set")
+	parser.add_argument("--data-fraction", type=float, default=1,
+			dest="dataFraction", help="fraction of data to be sent to nanonet")
 	parser.add_argument("--methyl", default=False, action="store_true", 
 			dest="methyl")
 	
@@ -109,6 +113,9 @@ def run(argv):
 	try:
 		fasta, eventalign = buildEventalign(options)
 		embedEventalign(options, fasta, eventalign)
+		callSubprocess(("./scripts/select_data_fraction.sh {0} {1}.train.txt"
+				" {1}.val.txt").format(options.dataFraction, options.outPrefix), 
+				options)
 		#trainNanonet(options)
 	finally:
 		# we'd better clean up after ourselves, even if it crashes

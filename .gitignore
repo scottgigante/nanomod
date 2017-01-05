@@ -4,3 +4,4 @@ install.sh
 nanomod/*.pyc
 .DS_Store
 ._.DS_Store
+scripts/.*.py
