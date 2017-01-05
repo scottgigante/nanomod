@@ -43,17 +43,17 @@ def parse_layer_feedforward_linear(size, weights):
 
 
 def parse_layer_softmax(layer, layer_type, idx):
-	size = layer.out_size - 1
+	size = layer.out_size
 	l = get_layer_dict(layer_type, idx, size)
 	weights = dict()
-	weights['input'] = layer.W.transpose()[:-1].flatten()
-	weights['bias'] = layer.b[:-1]
+	weights['input'] = layer.W.transpose().flatten()
+	weights['bias'] = layer.b
 	weights['internal'] = np.ndarray(shape=(0,0))
 	return l, weights
 
 
 def parse_layer_multiclass(in_network):
-	size = len(in_network.meta['kmers']) - 1 # XXXXXX isn't a real kmer
+	size = len(in_network.meta['kmers'])
 	layer = { "name": "postoutput",
 			  "type": "multiclass_classification",
 			  "size": size }
@@ -88,7 +88,9 @@ def parse_layer_blstm(layer, layer_type, idx):
 	wgts_internalPeep[:, 1, :] = pM2
 	
 	# transform
-	weights['input'] = wgts_input.transpose(0,1,3,2).reshape(-1)
+	weights['input'] = wgts_input.reshape(4, wgts_input.shape[0]/4, 
+			wgts_input.shape[1], wgts_input.shape[2], 
+			wgts_input.shape[3]).transpose(1,2,4,3,0).reshape(-1)
 	weights['bias'] = wgts_bias.reshape(-1)
 	weights['internal'] = np.append(
 			wgts_internalMat.transpose(0,1,3,2).reshape(-1), 
