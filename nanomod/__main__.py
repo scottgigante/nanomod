@@ -1,8 +1,21 @@
+################################################################################
+#                                                                              #
+# __main__.py: Runs Scott Gigante's Nanomod.                                   #
+# Input: Reference genome and fast5 reads                                      #
+# Output: fasta, bam, eventalign, labelled fast5 reads and (eventually) a      #
+# trained network for nanonetcall                                              #
+#                                                                              #
+# This file is part of Nanomod. Say something about a GNU licence?             #
+#                                                                              #
+# Author: Scott Gigante                                                        #
+# Contact: gigante.s@wehi.edu.au                                               #
+# Date: 06 Jan 2017                                                            #
+#                                                                              #
+################################################################################
+
 #!/usr/bin/env python
 
-# Runs Scott Gigante's Nanomod.
-
-# python -m nanomod -r data/Nott_R9_run2/downloads/pass/ -g data/ecoli_k12.fasta -o data/Nott_R9_run2 -v --temp-dir temp; python -m nanomod -r data/2016_09_11_E_COLI_MTHYLTD_R9/reads/downloads/pass/ -g data/ecoli_k12.fasta -o data/2016_09_11_E_COLI_MTHYLTD_R9 -v --temp-dir temp --methyl; python -m nanomod -r data/2016_09_18_E_COLI_NON_MTHYLTD_R9/reads/downloads/pass/ -g data/ecoli_k12.fasta -o data/2016_09_18_E_COLI_NON_MTHYLTD_R9 -v --temp-dir temp 
+# python -m nanomod -r data/Nott_R9_run2/downloads/pass/ -g data/ecoli_k12.fasta -o data/Nott_R9_run2 -v --temp-dir temp; python -m nanomod -r data/2016_09_11_E_COLI_MTHYLTD_R9/reads/downloads/pass/ -g data/ecoli_k12.fasta -o data/2016_09_11_E_COLI_MTHYLTD_R9 -v --temp-dir temp --methyl --force --data-fraction 0.1; python -m nanomod -r data/2016_09_18_E_COLI_NON_MTHYLTD_R9/reads/downloads/pass/ -g data/ecoli_k12.fasta -o data/2016_09_18_E_COLI_NON_MTHYLTD_R9 -v --temp-dir temp --force --data-fraction 0.1 
 
 import argparse
 import subprocess
@@ -12,11 +25,14 @@ from multiprocessing import cpu_count
 import tempfile
 import shutil
 
-from utils import log, makeDir, callSubprocess
+from utils import log, makeDir, callSubProcess
 from build_eventalign import buildEventalign
 from embed_eventalign import embedEventalign
 
 # create directories, move things to the right place, etc
+#
+# @args options Namespace object from argparse
+# @return None
 def initialiseArgs(options):	
 	# make the temp dir
 	makeDir(options.tempDir)
@@ -45,6 +61,10 @@ def initialiseArgs(options):
 						os.path.join(cwd, model))
 		shutil.copy(options.nanopolishModels, newModels)
 
+# move temporary files out of current working directory, delete temp directory
+#
+# @args options Namespace object from argparse
+# @return None
 def clean(options):
 	# delete temp files
 	shutil.rmtree(options.tempDir)
@@ -60,6 +80,10 @@ def clean(options):
 				os.remove(os.path.join(cwd, model))
 		os.remove(newModels)
 
+# parse command line args
+#
+# @args argv sys.argv
+# @return options Namespace object from argparse
 def parseArgs(argv):
 	
 	#command line options
@@ -107,13 +131,17 @@ def parseArgs(argv):
 	
 	return options
 
+# run main script
+# 
+# @args argv sys.argv
+# @return None
 def run(argv):
 	options = parseArgs(argv)
 	initialiseArgs(options)
 	try:
 		fasta, eventalign = buildEventalign(options)
 		embedEventalign(options, fasta, eventalign)
-		callSubprocess(("./scripts/select_data_fraction.sh {0} {1}.train.txt"
+		callSubProcess(("./scripts/select_data_fraction.sh {0} {1}.train.txt"
 				" {1}.val.txt").format(options.dataFraction, options.outPrefix), 
 				options)
 		#trainNanonet(options)

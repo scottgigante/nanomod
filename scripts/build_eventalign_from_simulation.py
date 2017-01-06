@@ -1,8 +1,19 @@
-#!/usr/bin/env python
+################################################################################
+#                                                                              #
+# build_eventalign_from_simulation.py: run a simulation of ONT reads and write #
+# the corresponding event and sequence data into an eventalign file.           #
+#                                                                              #
+# TODO: add options for 1D, 1D template only, 2D                               #
+#                                                                              #
+# This file is part of Nanomod. Say something about a GNU licence?             #
+#                                                                              #
+# Author: Scott Gigante                                                        #
+# Contact: gigante.s@wehi.edu.au                                               #
+# Date: 06 Jan 2017                                                            #
+#                                                                              #
+################################################################################
 
-# from Rob Egan's fork of Deepnano
-# https://bitbucket.org/robegan21/deepnano/commits/661986be77ac3d6b5178e947a3bab965e5a56f2b
-# TODO: add options for 1D, 1D template only, 2D
+#!/usr/bin/env python
 
 from __future__ import print_function
 from optparse import OptionParser

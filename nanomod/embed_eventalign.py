@@ -1,3 +1,18 @@
+################################################################################
+#                                                                              #
+# embed_eventalign.py: use eventalign data to label individual fast5 reads     #
+# in order to feed labelled fast5 files into neural network training.          #
+#                                                                              #
+# TODO: remove Numpy FutureWarning from selecting fields in structured array.  #
+#                                                                              #
+# This file is part of Nanomod. Say something about a GNU licence?             #
+#                                                                              #
+# Author: Scott Gigante                                                        #
+# Contact: gigante.s@wehi.edu.au                                               #
+# Date: 06 Jan 2017                                                            #
+#                                                                              #
+################################################################################
+
 from Bio import SeqIO
 import os
 import pysam
@@ -11,12 +26,31 @@ from shutil import copyfile
 from seq_tools import *
 from utils import log, makeDir
 
-__outdir_name__ = "nanomod"
+__outdir_name__ = "nanomod" # subdirectory to be created in the output dir
 
+# get the path of the output file corresponding to a fast5 file
+#
+# @args fast5 basename of the fast5 file
+# @args options Namespace object from argparse
+# @return path to output fast5 file
 def getOutfile(fast5, options):
 	return os.path.join(options.outPrefix, __outdir_name__, fast5)
 
-def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer):
+# write a labelled fast5 file
+#
+# @args options Namespace object from argparse
+# @args events Structured numpy array including event labels
+# @args fast5Path path to original fast5 file
+# @args initial_ref_index starting position of read on reference genome
+# @args last_ref_index ending position of read on reference genome
+# @args chromosome Name of the chromosome to which fast5 is aligned
+# @args forward Boolean value representing forward or reverse read along genome
+# @args numSkips Number of skipped bases on genome
+# @args numStays Number of repeated events without moving along genome
+# @args kmer Length of kmer labels
+# @return String representing whether fast5 file should be train or val data
+def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, 
+		chromosome, forward, numSkips, numStays, kmer):
 
 	# all events are considered good emissions - bad idea?
 	events = append_fields(events, 'good_emission', events["kmer"] != 'X'*kmer)
@@ -52,7 +86,8 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, ch
 		fastaGroup = alignGroup.create_group("Aligned_template")
 		# our current eventalign files don't have the same chromosome name!???
 		fasta = options.genome["Chromosome"].format("fasta")
-		fastaGroup.create_dataset("Fasta", data=options.genome["Chromosome"].format("fasta"))
+		fastaGroup.create_dataset("Fasta", 
+				data=options.genome["Chromosome"].format("fasta"))
 		
 		# create attrs
 		summaryGroup = alignGroup.create_group("Summary")
@@ -60,11 +95,21 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, ch
 		attrs = attrsGroup.attrs
 		attrs.create("genome", chromosome)
 		
+	# choose which dataset to add to and return
 	if np.random.rand() < options.valFraction:
 		return "val"
 	else:
 		return "train"
 
+# step through eventalign data corresponding to a fast5 file and label events
+#
+# TODO: can we determine kmer length earlier?
+# TODO: should we return a tuple?
+#
+# @args options Namespace object from argparse
+# @args idx headers index of eventalign file
+# @args fast5Path path to original fast5 file
+# @return two-element array containing basename of fast5 file and string reference to either training or validation dataset
 def processRead(options, idx, fast5Path):
 	
 	fast5File = fast5Path.split('/')[-1]
@@ -93,11 +138,11 @@ def processRead(options, idx, fast5Path):
 	numSkips = 0
 	numStays = 0
 	
-	# note that eventalign must be run with --scale-events of shift/drift will be an issue
 	for line in eventalign:
 		
 		if not line[idx['strand']] == 't':
-			# finished reading the template, now reading complement of the same read - skip
+			# finished reading the template
+			# now reading complement of the same read - skip
 			break
 		
 		seq = line[idx['ref_kmer']]
@@ -135,14 +180,24 @@ def processRead(options, idx, fast5Path):
 		newEvents["kmer"][int(line[idx['event_index']])] = seq
 	
 	fast5.close()
-	#try:
 	trainType = writeFast5(options, newEvents, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer)
 	return [fast5File, trainType]
-	#except Exception as e:
-#		log("Failed to write " + fast5File, 0, options)
-#		log(str(e), 0, options)
-#		return ["",""]
 
+# multiprocessing wrapper of processRead
+# @args args an array of arguments for processRead
+# @return two-element array containing basename of fast5 file and string reference to either training or validation dataset
+def processReadWrapper(args):
+   return processRead(*args)
+
+# write temporary .npy files to split eventalign tsv file into chunks 
+# corresponding to one fast5 file each - this allows multiprocessing later on
+#
+# @args options Namespace object from argparse
+# @args eventalign filename of eventalign tsv
+# @args refs dictionary linking read names and fast5 file paths
+# @return filenames a list of paths to fast5 files which have been processed
+# @return idx a dictionary linking headers with positions in the tsv
+# @return premadeFilenames a list of basenames of fast5 files which had already been processed prior to this call to Nanomod
 def writeTempFiles(options, eventalign, refs):
 	if not os.path.exists(options.tempDir):
 		os.makedirs(options.tempDir)
@@ -227,9 +282,14 @@ def writeTempFiles(options, eventalign, refs):
 		
 	return filenames, idx, premadeFilenames
 
-def processReadWrapper(args):
-   return processRead(*args)
-
+# add a pre-processed fast5 file to either the training or validation dataset
+#
+# TODO: should this all be done in one place? processRead could instead return a filename
+#
+# @args options Namespace object from argparse
+# @args filenames List of fast5 basenames to be added
+# @args trainData Dataset to which premade files should be added
+# @return Supplemented dataset
 def appendPremade(options, filenames, trainData):
 	for fn in filenames:
 		if np.random.rand() < options.valFraction:
@@ -239,6 +299,11 @@ def appendPremade(options, filenames, trainData):
 		trainData.append([fn, trainType])
 	return trainData
 
+# write text files for training and validation consisting of fast5 basenames
+#
+# @args options Namespace object from argparse
+# @args trainData Dataset consisting or two-element arrays of filename and dataset to which file should be added (either "train" or "val")
+# @return None
 def writeTrainfiles(options, trainData):
 	trainFilename = options.outPrefix + ".train.txt"
 	valFilename = options.outPrefix + ".val.txt"
@@ -250,11 +315,18 @@ def writeTrainfiles(options, trainData):
 		valFile.write("#filename\n")
 		
 		for line in trainData:
-			if line[1] == 'train':
-				trainFile.write(line[0] + "\n")
-			elif line[1] == 'val':
-				valFile.write(line[0] + "\n")
+			if os.path.isfile(getOutfile(line[1], options)):
+				if line[1] == 'train':
+					trainFile.write(line[0] + "\n")
+				elif line[1] == 'val':
+					valFile.write(line[0] + "\n")
 
+# main script: embed labels to reference genome into fast5 files
+#
+# @args options Namespace object from argparse
+# @args fasta Fasta filename corresponding to reads (MUST be produced by poretools)
+# @args eventalign Filename of eventalign tsv output
+# @return None
 def embedEventalign(options, fasta, eventalign):
 	makeDir(os.path.join(options.outPrefix, __outdir_name__))
 	log("Loading fast5 names and references...", 1, options)

@@ -1,4 +1,18 @@
+################################################################################
+#                                                                              #
+# pickle_to_current.py: reverse engineer a CURRENNT network file from the      #
+# .npy network as saved by Nanonet's currennt_to_pickle.py.                    #
+#                                                                              #
+# This file is part of Nanomod. Say something about a GNU licence?             #
+#                                                                              #
+# Author: Scott Gigante                                                        #
+# Contact: gigante.s@wehi.edu.au                                               #
+# Date: 06 Jan 2017                                                            #
+#                                                                              #
+################################################################################
+
 #!/usr/bin/env python
+
 import argparse
 import json
 import sys
