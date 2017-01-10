@@ -44,7 +44,8 @@ def checkExecutable(progname):
         		" set via the environment variable '{1}'.").format(progname, 
         		progname.upper()))
 
-# initialise and check all executables
-for p in __prognames__:
-	initExecutable(p)
-	checkExecutable(p)
+def init():
+	# initialise and check all executables
+	for p in __prognames__:
+		initExecutable(p)
+		checkExecutable(p)

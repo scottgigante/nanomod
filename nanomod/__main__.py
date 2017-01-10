@@ -28,12 +28,16 @@ import shutil
 from utils import log, makeDir, callSubProcess
 from build_eventalign import buildEventalign
 from embed_eventalign import embedEventalign
+from . import init
 
 # create directories, move things to the right place, etc
 #
 # @args options Namespace object from argparse
 # @return None
-def initialiseArgs(options):	
+def initialiseArgs(options):
+	# check executables
+	init()
+	
 	# make the temp dir
 	makeDir(options.tempDir)
 	options.tempDir = os.path.join(options.tempDir, 
