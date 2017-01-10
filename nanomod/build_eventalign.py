@@ -43,6 +43,8 @@ def callPoretoolsWrapper(args):
 	return callPoretools(*args)
 
 # runs poretools multithreaded on small chunks of fasta files
+# 
+# Could be deprecated by find . -name "*.fast5" | parallel "poretools fasta" 
 #
 # TODO: why can't this handle more than eight cores? Arbitrary.
 #
@@ -89,6 +91,11 @@ def buildEventalign(options):
 	
 	fastaFile = '{}.fasta'.format(options.outPrefix)
 	multithreadPoretools(__exe__['poretools'], options, fastaFile)
+	#poretoolsMaxFiles = 1000
+	#callSubProcess(('find {} -name "*.fast5" | parallel -l {} "{} ' 
+	#		'fasta"').format(options.reads, poretoolsMaxFiles, 
+	#		__exe__['poretools']), options, newFile=fastaFile, 
+	#		outputFile=fastaFile)
 	
 	callSubProcess('{} index {}'.format(__exe__['bwa'], options.genome), 
 			options, newFile="{}.fai".format(options.genome))
