@@ -102,9 +102,9 @@ def parse_layer_blstm(layer, layer_type, idx):
 	wgts_internalPeep[:, 1, :] = pM2
 	
 	# transform
-	weights['input'] = wgts_input.reshape(4, wgts_input.shape[0]/4, 
-			wgts_input.shape[1], wgts_input.shape[2], 
-			wgts_input.shape[3]).transpose(1,2,4,3,0).reshape(-1)
+	weights['input'] = wgts_input.reshape(-1,4,wgts_input.shape[1], 
+			wgts_input.shape[2], 
+			wgts_input.shape[3]).transpose(1,2,3,4,0).reshape(-1)
 	weights['bias'] = wgts_bias.reshape(-1)
 	weights['internal'] = np.append(
 			wgts_internalMat.transpose(0,1,3,2).reshape(-1), 
