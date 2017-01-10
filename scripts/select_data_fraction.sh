@@ -1,5 +1,20 @@
 ################################################################################
 #                                                                              #
+# This file is part of Nanomod.                                                #
+#                                                                              #
+# Nanomod is free software: you can redistribute it and/or modify              #
+# it under the terms of the GNU General Public License as published by         #
+# the Free Software Foundation, either version 3 of the License, or            #
+# (at your option) any later version.                                          #
+#                                                                              #
+# Nanomod is distributed in the hope that it will be useful,                   #
+# but WITHOUT ANY WARRANTY; without even the implied warranty of               #
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                #
+# GNU General Public License for more details.                                 #
+#                                                                              #
+# You should have received a copy of the GNU General Public License            #
+# along with Nanomod.  If not, see <http://www.gnu.org/licenses/>.             #
+#                                                                              #
 # select_data_fraction.sh: use shell scripts to efficiently select a random    #
 # number of lines (as well as the header) from a text file. This is used to    #
 # randomly select a fraction of the labelled fast5 files to feed into nanonet  #
@@ -12,8 +27,7 @@
 # @return $3.small The reduced validation output file                          #
 #                                                                              #
 # TODO: Allow one or both input files to be empty.                             #
-#                                                                              #
-# This file is part of Nanomod. Say something about a GNU licence?             #
+# TODO: Allow a random seed / just take head instead of shuf                   #
 #                                                                              #
 # Author: Scott Gigante                                                        #
 # Contact: gigante.s@wehi.edu.au                                               #

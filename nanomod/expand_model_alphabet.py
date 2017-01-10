@@ -1,3 +1,32 @@
+################################################################################
+#                                                                              #
+# This file is part of Nanomod.                                                #
+#                                                                              #
+# Nanomod is free software: you can redistribute it and/or modify              #
+# it under the terms of the GNU General Public License as published by         #
+# the Free Software Foundation, either version 3 of the License, or            #
+# (at your option) any later version.                                          #
+#                                                                              #
+# Nanomod is distributed in the hope that it will be useful,                   #
+# but WITHOUT ANY WARRANTY; without even the implied warranty of               #
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                #
+# GNU General Public License for more details.                                 #
+#                                                                              #
+# You should have received a copy of the GNU General Public License            #
+# along with Nanomod.  If not, see <http://www.gnu.org/licenses/>.             #
+#                                                                              #
+# expand_model_alphabet.py: builds a currennt network json for an enlarged     #
+# base alphabet from an existing network: assumes that modified bases start    #
+# with initialisation equal to the unmodified bases.                           #
+#                                                                              #
+# TODO: Make methylation / demethylation more general.                         #
+#                                                                              #
+# Author: Scott Gigante                                                        #
+# Contact: gigante.s@wehi.edu.au                                               #
+# Date: 06 Jan 2017                                                            #
+#                                                                              #
+################################################################################
+
 import json
 from nanonet.util import all_kmers
 
