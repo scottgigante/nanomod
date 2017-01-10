@@ -66,3 +66,12 @@ def methylateSeq(seq):
 	# simply replacing CG with MG leaves out sequences ending in C that could be methylated
 	# as a result, we can't use the last base of the sequence effectively	
 	return seq.replace("CG","MG")
+
+# undo CpG methylation to a sequence
+#
+# @args seq The sequence to be demethylated
+# @return The demethylated sequence
+def demethylateSeq(seq):
+	if seq[-1] == 'M':
+		seq = seq[:-2] + 'C'
+	return seq.replace("MG","CG")
