@@ -59,6 +59,9 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 	names.remove("move")
 	newEvents = events[names].copy()
 	
+	# remove unlabelled events -  TODO: is this helpful?
+	newEvents = newEvents[newEvents["kmer"] != 'X'*kmer]
+	
 	filename = fast5Path.split('/')[-1]
 	newPath = getOutfile(filename, options)
 	copyfile(fast5Path, newPath)
@@ -85,6 +88,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 		alignGroup = analysesGroup.create_group("Alignment")
 		fastaGroup = alignGroup.create_group("Aligned_template")
 		# our current eventalign files don't have the same chromosome name!???
+		# TODO: don't do this pls
 		fasta = options.genome["Chromosome"].format("fasta")
 		fastaGroup.create_dataset("Fasta", 
 				data=options.genome["Chromosome"].format("fasta"))
@@ -95,11 +99,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 		attrs = attrsGroup.attrs
 		attrs.create("genome", chromosome)
 		
-	# choose which dataset to add to and return
-	if np.random.rand() < options.valFraction:
-		return "val"
-	else:
-		return "train"
+	return newPath
 
 # step through eventalign data corresponding to a fast5 file and label events
 #
@@ -122,14 +122,14 @@ def processRead(options, idx, fast5Path):
 		fast5 = h5py.File(fast5Path, 'r')
 	except IOError:
 		log("Failed to read {}".format(fast5Path), 0, options)
-		return ["",""]
+		return None
 		
-	# r7.3 for now
+	# r9 for now
 	events = np.array(fast5.get("Analyses/Basecall_1D_000/BaseCalled_template/Events"))
 	if kmer is None:
 		kmer = len(eventalign[0][idx['ref_kmer']])
 	newEvents = append_fields(events, 'kmer', ['X'*kmer] * events.shape[0])
-	newEvents = append_fields(newEvents, 'seq_pos', [0] * events.shape[0])
+	newEvents = append_fields(newEvents, 'seq_pos', [-1] * events.shape[0]) # is there a better option here? keep counting?
 	initial_event_index = int(eventalign[0][idx['event_index']])
 	initial_ref_index = int(eventalign[0][idx['ref_pos']])
 	last_ref_index = initial_ref_index-1
@@ -170,9 +170,10 @@ def processRead(options, idx, fast5Path):
 		
 		if last_ref_index == current_ref_index:
 			numStays += 1
-		elif last_ref_index < current_ref_index-1:
+		elif abs(last_ref_index - current_ref_index) > 1:
 			# does skipping two bases at once count as 2 skips or one???
-			numSkips += 1
+			# TODO: count size of skip, take negative into account
+			numSkips += abs(last_ref_index - current_ref_index) - 1
 		last_ref_index = current_ref_index
 		last_seq_pos = seq_pos
 		
@@ -180,8 +181,8 @@ def processRead(options, idx, fast5Path):
 		newEvents["kmer"][int(line[idx['event_index']])] = seq
 	
 	fast5.close()
-	trainType = writeFast5(options, newEvents, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer)
-	return [fast5File, trainType]
+	outfile = writeFast5(options, newEvents, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer)
+	return fast5File
 
 # multiprocessing wrapper of processRead
 # @args args an array of arguments for processRead
@@ -258,7 +259,8 @@ def writeTempFiles(options, eventalign, refs):
 				
 				outfile = getOutfile(fast5Name, options)
 				filename = os.path.join(options.tempDir, fast5Name)
-				if (not options.force) and os.path.isfile(outfile):
+				# TODO: change this back
+				if False:#(not options.force) and os.path.isfile(outfile):
 					log(outfile + " already exists. Use --force to recompute.", 0, options)
 					skip=True
 					premadeFilenames.append(fast5Name)
@@ -282,23 +284,6 @@ def writeTempFiles(options, eventalign, refs):
 		
 	return filenames, idx, premadeFilenames
 
-# add a pre-processed fast5 file to either the training or validation dataset
-#
-# TODO: should this all be done in one place? processRead could instead return a filename
-#
-# @args options Namespace object from argparse
-# @args filenames List of fast5 basenames to be added
-# @args trainData Dataset to which premade files should be added
-# @return Supplemented dataset
-def appendPremade(options, filenames, trainData):
-	for fn in filenames:
-		if np.random.rand() < options.valFraction:
-			trainType="val"
-		else:
-			trainType="train"
-		trainData.append([fn, trainType])
-	return trainData
-
 # write text files for training and validation consisting of fast5 basenames
 #
 # @args options Namespace object from argparse
@@ -314,12 +299,14 @@ def writeTrainfiles(options, trainData):
 		trainFile.write("#filename\n")
 		valFile.write("#filename\n")
 		
-		for line in trainData:
-			if os.path.isfile(getOutfile(line[1], options)):
-				if line[1] == 'train':
-					trainFile.write(line[0] + "\n")
-				elif line[1] == 'val':
-					valFile.write(line[0] + "\n")
+		for filename in trainData:
+			if os.path.isfile(getOutfile(filename, options)):
+				if np.random.rand() > options.valFraction:
+					log("Training set: {}".format(filename), 2, options)
+					trainFile.write(filename + "\n")
+				else:
+					log("Validation set: {}".format(filename), 2, options)
+					valFile.write(filename + "\n")
 
 # main script: embed labels to reference genome into fast5 files
 #
@@ -341,5 +328,7 @@ def embedEventalign(options, fasta, eventalign):
 			[[options, idx, i] for i in filenames])
 	log(("Adding data for {} premade fast5" 
 			"files...").format(len(premadeFilenames)), 1, options)
-	trainData = appendPremade(options, premadeFilenames, trainData)
+	trainData.extend(premadeFilenames)
+	log(("Saving datasets for {} total fast5" 
+			"files...").format(len(trainData)), 1, options)
 	writeTrainfiles(options, trainData)
