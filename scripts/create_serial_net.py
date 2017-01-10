@@ -19,23 +19,25 @@
 # integers in ascending order. Used to facilitate comparison pre- and post-    #
 # conversion using pickle_to_currennt.py                                       #
 #                                                                              #
-# TODO: allow command line args                                                #
+# TODO: use argparse                                                           #
 #                                                                              #
 # Author: Scott Gigante                                                        #
 # Contact: gigante.s@wehi.edu.au                                               #
-# Date: 06 Jan 2017                                                            #
+# Date: 10 Jan 2017                                                            #
 #                                                                              #
 ################################################################################
+
 import json
+import sys
 
 def reweightArray(net, layer, wgts):
 	net['weights'][layer][wgts] = range(len(net['weights'][layer][wgts]))
 	return net
 
 def reweightLayer(net, layer):
-	net = reweightArray(net, layer, 'input')
-	net = reweightArray(net, layer, 'bias')
-	net = reweightArray(net, layer, 'internal')
+	weights = ['input','bias','internal']
+	for w in weights:
+		net = reweightArray(net, layer, w)
 	return net
 
 def reweightNet(net):
@@ -53,6 +55,8 @@ def writeNet(net, filename):
 		json.dump(net, fp=fh, indent=4)
 
 # main
-net = readNet("models/default_template.json")
+in_filename = sys.argv[1]
+out_filename = "{}.serial.json".format(filename) if len(sys.argv) < 2 else sys.argv[2]
+net = readNet(filename)
 net = reweightNet(net)
-writeNet(net, "models/serial.json")
+writeNet(net, out_filename)
