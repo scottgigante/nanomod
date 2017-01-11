@@ -65,7 +65,7 @@ def callPoretoolsWrapper(args):
 # @args options Namespace object from argparse
 # @args output Path to final output fasta file
 # @return None
-def multithreadPoretools(poretools, options, output):
+def multithreadPoretools(poretools, options, output, filesPerCall=1000):
 	# check first that we actually want to edit
 	if callSubProcess("touch {}".format(output), options, newFile=output) == 1:
 		return 1
@@ -76,7 +76,6 @@ def multithreadPoretools(poretools, options, output):
 	os.chdir(cwd)
 	prefix = [poretools, "fasta"]
 	
-	filesPerCall = 1000 # in practice, os probably supports more
 	calls = [prefix + files[i:i + filesPerCall] for i in xrange(0, len(files),
 			filesPerCall)]
 	args = [[call, options] for call in calls]
@@ -105,7 +104,7 @@ def buildEventalign(options):
 	fastaFile = '{}.fasta'.format(options.outPrefix)
 	multithreadPoretools(__exe__['poretools'], options, fastaFile)
 	#poretoolsMaxFiles = 1000
-	#callSubProcess(('find {} -name "*.fast5" | parallel -l {} "{} ' 
+	#callSubProcess(('find {} -name "*.fast5" | parallel -j16 -l {} "{} ' 
 	#		'fasta"').format(options.reads, poretoolsMaxFiles, 
 	#		__exe__['poretools']), options, newFile=fastaFile, 
 	#		outputFile=fastaFile)

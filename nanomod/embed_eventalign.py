@@ -117,7 +117,6 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 # step through eventalign data corresponding to a fast5 file and label events
 #
 # TODO: can we determine kmer length earlier?
-# TODO: should we return a tuple?
 #
 # @args options Namespace object from argparse
 # @args idx headers index of eventalign file
