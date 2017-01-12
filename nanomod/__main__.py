@@ -145,9 +145,9 @@ def run(argv):
 	try:
 		fasta, eventalign = buildEventalign(options)
 		embedEventalign(options, fasta, eventalign)
-		callSubProcess(("./scripts/select_data_fraction.sh {0} {1}.train.txt"
-				" {1}.val.txt").format(options.dataFraction, options.outPrefix), 
-				options)
+		#callSubProcess(("./scripts/select_data_fraction.sh {0} {1}.train.txt"
+		#		" {1}.val.txt").format(options.dataFraction, options.outPrefix), 
+		#		options)
 		#trainNanonet(options)
 	finally:
 		# we'd better clean up after ourselves, even if it crashes
