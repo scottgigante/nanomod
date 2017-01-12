@@ -106,7 +106,7 @@ def multiprocessWrapper(func, args):
 	try:
 		return func(*args)
 	except Exception as e:
-		print('Caught exception in worker thread: {}({})'.format(func.__name__ 
+		print('Caught exception in worker thread: {}({})'.format(func.__name__, 
 				", ".join(args)))
 		traceback.print_exc()
 		print()
