@@ -99,11 +99,10 @@ def makeDir(dir):
 		pass
 		
 # multiprocessing.Pool.map() wrapper for functions taking more than one argument
-# @args args an array of arguments, the first of which is the name of the function to be called
+# @args func the function to be called
+# @args args an array of arguments for the function
 # @return return value of called function
-def multiprocessWrapper(args):
-	func = args[0]
-	args = args[1:]
+def multiprocessWrapper(func, args):
 	try:
 		return func(*args)
 	except Exception as e:

@@ -339,6 +339,12 @@ def writeTrainfiles(options, trainData):
 					if pass_quality:
 						smallValFile.write(filename + "\n")
 
+def processReadWrapper(args):
+	return multiprocessWrapper(processRead, args)
+
+def checkPremadeWrapper(args):
+	return multiprocessWrapper(checkPremade, args)
+
 # main script: embed labels to reference genome into fast5 files
 #
 # @args options Namespace object from argparse
@@ -357,11 +363,11 @@ def embedEventalign(options, fasta, eventalign):
 	pool = Pool(options.threads)
 	log("Embedding labels into {} fast5 files...".format(len(filenames)), 1,
 			options)
-	trainData = pool.map(multiprocessWrapper, 
-			[[processRead, options, idx, i] for i in filenames])
+	trainData = pool.map(processRead, 
+			[[options, idx, i] for i in filenames])
 	log(("Adding data for {} premade fast5" 
 			"files...").format(len(premadeFilenames)), 1, options)
-	trainData.extend(pool.map(multiprocessWrapper, [[checkPremade, options, i] for i in premadeFilenames]))
+	trainData.extend(pool.map(checkPremadeWrapper, [[options, i] for i in premadeFilenames]))
 	log(("Saving datasets for {} total fast5" 
 			"files...").format(len(trainData)), 1, options)
 	writeTrainfiles(options, trainData)
