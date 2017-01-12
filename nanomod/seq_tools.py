@@ -37,8 +37,7 @@ def loadRef(fasta):
 	for record in SeqIO.parse(handle, "fasta"):
 		#print "%s with %d bases\n" % (record.id, len(record.seq))
 		fast5Path = record.description.split(' ')[-1]
-		refs[record.id] = (fast5Path if os.path.isabs(fast5Path) else 
-				os.path.join([readsPath, fast5Path]))
+		refs[record.id] = os.path.abspath(fast5Path)
 	handle.close()
 	return refs
 
