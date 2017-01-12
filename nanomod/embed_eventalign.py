@@ -32,12 +32,13 @@ import pysam
 import h5py
 import numpy as np
 import csv
-from numpy.lib.recfunctions import append_fields
+from numpy.lib.recfunctions import append_fields, drop_fields
 from multiprocessing import Pool, cpu_count
 from shutil import copyfile
 
 from seq_tools import *
-from utils import log, makeDir
+from utils import log, makeDir, multiprocessWrapper
+from check_skip_stay_prob import getSkipStayConstraints
 
 __outdir_name__ = "nanomod" # subdirectory to be created in the output dir
 
@@ -64,16 +65,19 @@ def getOutfile(fast5, options):
 # @return String representing whether fast5 file should be train or val data
 def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, 
 		chromosome, forward, numSkips, numStays, kmer):
-
+	# check if this read passes or fails
+	numEvents = events.shape[0]
+	skipProb = float(numSkips)/numEvents
+	stayProb = float(numStays)/numEvents
+	stepProb = 1-skipProb-stayProb
+	
 	# all events are considered good emissions - bad idea?
 	events = append_fields(events, 'good_emission', events["kmer"] != 'X'*kmer)
 	# remove move field - nanonet adds it
-	names = list(events.dtype.names)
-	names.remove("move")
-	newEvents = events[names].copy()
+	events = drop_fields(events, "move")
 	
 	# remove unlabelled events -  TODO: is this helpful?
-	newEvents = newEvents[newEvents["kmer"] != 'X'*kmer]
+	events = events[events["kmer"] != 'X'*kmer]
 	
 	filename = fast5Path.split('/')[-1]
 	newPath = getOutfile(filename, options)
@@ -84,7 +88,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 		
 		# create events
 		eventsGroup = alignToRefGroup.create_group("CurrentSpaceMapped_template")
-		eventsGroup.create_dataset("Events", data= newEvents)
+		eventsGroup.create_dataset("Events", data=events)
 		
 		# create attrs
 		summaryGroup = alignToRefGroup.create_group("Summary")
@@ -92,10 +96,15 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 		attrs = attrsGroup.attrs
 		attrs.create("genome_start", initial_ref_index)
 		attrs.create("genome_end", last_ref_index)
+		attrs.create("sequence_length", last_ref_index - initial_ref_index)
 		attrs.create("ref_name", chromosome)
 		attrs.create("direction", "+" if forward else "-")
 		attrs.create("num_skips", numSkips)
 		attrs.create("num_stays", numStays)
+		attrs.create("num_events", numEvents)
+		attrs.create("skip_prob", skipProb)
+		attrs.create("stay_prob", stayProb)
+		attrs.create("step_prob", stepProb)
 		
 		# create alignment group
 		alignGroup = analysesGroup.create_group("Alignment")
@@ -112,7 +121,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 		attrs = attrsGroup.attrs
 		attrs.create("genome", chromosome)
 		
-	return newPath
+	return skipProb < options.constraints['maxSkips'] and stayProb < options.constraints['maxStays'] and stepProb > options.constraints['minSteps']
 
 # step through eventalign data corresponding to a fast5 file and label events
 #
@@ -140,8 +149,8 @@ def processRead(options, idx, fast5Path):
 	events = np.array(fast5.get("Analyses/Basecall_1D_000/BaseCalled_template/Events"))
 	if kmer is None:
 		kmer = len(eventalign[0][idx['ref_kmer']])
-	newEvents = append_fields(events, 'kmer', ['X'*kmer] * events.shape[0])
-	newEvents = append_fields(newEvents, 'seq_pos', [-1] * events.shape[0]) # is there a better option here? keep counting?
+	events = append_fields(events, 'kmer', ['X'*kmer] * events.shape[0])
+	events = append_fields(events, 'seq_pos', [-1] * events.shape[0]) # is there a better option here? keep counting?
 	initial_event_index = int(eventalign[0][idx['event_index']])
 	initial_ref_index = int(eventalign[0][idx['ref_pos']])
 	last_ref_index = initial_ref_index-1
@@ -189,18 +198,12 @@ def processRead(options, idx, fast5Path):
 		last_ref_index = current_ref_index
 		last_seq_pos = seq_pos
 		
-		newEvents["seq_pos"][int(line[idx['event_index']])] = seq_pos
-		newEvents["kmer"][int(line[idx['event_index']])] = seq
+		events["seq_pos"][int(line[idx['event_index']])] = seq_pos
+		events["kmer"][int(line[idx['event_index']])] = seq
 	
 	fast5.close()
-	outfile = writeFast5(options, newEvents, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer)
-	return fast5File
-
-# multiprocessing wrapper of processRead
-# @args args an array of arguments for processRead
-# @return two-element array containing basename of fast5 file and string reference to either training or validation dataset
-def processReadWrapper(args):
-   return processRead(*args)
+	pass_quality = writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer)
+	return [fast5File, pass_quality]
 
 # write temporary .npy files to split eventalign tsv file into chunks 
 # corresponding to one fast5 file each - this allows multiprocessing later on
@@ -261,8 +264,9 @@ def writeTempFiles(options, eventalign, refs):
 					fast5Path = refs[current_read_name]
 				except KeyError:
 					skip = True
-					log(fast5Path + " not found", 0, options)
+					log(current_read_name + " not found", 0, options)
 					continue
+					
 				fast5Name = fast5Path.split('/')[-1]
 				if line[idx['strand']] != 't':
 					# not template, skip
@@ -271,9 +275,8 @@ def writeTempFiles(options, eventalign, refs):
 				
 				outfile = getOutfile(fast5Name, options)
 				filename = os.path.join(options.tempDir, fast5Name)
-				# TODO: change this back
-				if False:#(not options.force) and os.path.isfile(outfile):
-					log(outfile + " already exists. Use --force to recompute.", 0, options)
+				if (not options.force) and os.path.isfile(outfile):
+					log(outfile + " already exists. Use --force to recompute.", 1, options)
 					skip=True
 					premadeFilenames.append(fast5Name)
 					continue
@@ -296,6 +299,16 @@ def writeTempFiles(options, eventalign, refs):
 		
 	return filenames, idx, premadeFilenames
 
+# check quality of premade fast5 files
+def checkPremade(options, filename):
+	with h5py.File(filename, 'r') as fh:
+		attrs = fh.get("Analyses/Basecall_1D_000/Summary/basecall_1d_template").attrs
+		numEvents = float(attrs["called_events"])
+		skipProb = attrs["num_skips"]/numEvents
+		stayProb = attrs["num_stays"]/numEvents
+		stepProb = 1-skipProb-stayProb
+	return [filename, skipProb < options.constraints['maxSkips'] and stayProb < options.constraints['maxStays'] and stepProb > options.constraints['minSteps']]
+
 # write text files for training and validation consisting of fast5 basenames
 #
 # @args options Namespace object from argparse
@@ -305,20 +318,26 @@ def writeTrainfiles(options, trainData):
 	trainFilename = options.outPrefix + ".train.txt"
 	valFilename = options.outPrefix + ".val.txt"
 	
-	with open(trainFilename, 'w') as trainFile, open(valFilename, 'w') as valFile:
+	with open(trainFilename, 'w') as trainFile, open(valFilename, 'w') as valFile, open(trainFilename + ".small", 'w') as smallTrainFile,	open(valFilename + ".small", 'w') as smallValFile:
 
 		# write trainFile / valFile headers
 		trainFile.write("#filename\n")
 		valFile.write("#filename\n")
+		smallTrainFile.write("#filename\n")
+		smallValFile.write("#filename\n")
 		
-		for filename in trainData:
+		for filename, pass_quality in trainData:
 			if os.path.isfile(getOutfile(filename, options)):
 				if np.random.rand() > options.valFraction:
 					log("Training set: {}".format(filename), 2, options)
 					trainFile.write(filename + "\n")
+					if pass_quality:
+						smallTrainFile.write(filename + "\n")
 				else:
 					log("Validation set: {}".format(filename), 2, options)
 					valFile.write(filename + "\n")
+					if pass_quality:
+						smallValFile.write(filename + "\n")
 
 # main script: embed labels to reference genome into fast5 files
 #
@@ -331,16 +350,18 @@ def embedEventalign(options, fasta, eventalign):
 	log("Loading fast5 names and references...", 1, options)
 	refs = loadRef(fasta)
 	options.genome = loadGenome(options.genome)
+	log("Calculating skip/stay count constraints...", 1, options)
+	options.constraints = getSkipStayConstraints(options.reads, options.dataFraction)
 	log("Splitting eventalign into separate files...", 1, options)
 	filenames, idx, premadeFilenames = writeTempFiles(options, eventalign, refs)
 	pool = Pool(options.threads)
 	log("Embedding labels into {} fast5 files...".format(len(filenames)), 1,
 			options)
-	trainData = pool.map(processReadWrapper, 
-			[[options, idx, i] for i in filenames])
+	trainData = pool.map(multiprocessWrapper, 
+			[[processRead, options, idx, i] for i in filenames])
 	log(("Adding data for {} premade fast5" 
 			"files...").format(len(premadeFilenames)), 1, options)
-	trainData.extend(premadeFilenames)
+	trainData.extend(pool.map(multiprocessWrapper, [[checkPremade, options, i] for i in premadeFilenames]))
 	log(("Saving datasets for {} total fast5" 
 			"files...").format(len(trainData)), 1, options)
 	writeTrainfiles(options, trainData)

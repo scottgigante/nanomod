@@ -97,3 +97,18 @@ def makeDir(dir):
 	except OSError:
 		# already exists
 		pass
+		
+# multiprocessing.Pool.map() wrapper for functions taking more than one argument
+# @args args an array of arguments, the first of which is the name of the function to be called
+# @return return value of called function
+def multiprocessWrapper(args):
+	func = args[0]
+	args = args[1:]
+	try:
+		return func(*args)
+	except Exception as e:
+		print('Caught exception in worker thread: {}({})'.format(func, 
+				", ".join(args)))
+		traceback.print_exc()
+		print()
+		raise e
