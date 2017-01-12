@@ -27,6 +27,7 @@ from __future__ import print_function
 import os
 import sys
 import subprocess
+import traceback
 
 __log_levels__ = ['[warning] ','[debug] ','[log] ']
 
@@ -61,30 +62,34 @@ def log(message, level, options):
 # @args mode Writing mode: choose from w, wb, a
 def callSubProcess(call, options, newFile=None, outputFile=None, close_fds=True, 
 		shell=True, mode='w'):
-	# we should use shell=False to make this more portable
-	# print call to debug
-	log(call, 1, options)
+	try:
+		# we should use shell=False to make this more portable
+		# print call to debug
+		log(call, 1, options)
 	
-	# check if we are accidentally overwriting something
-	if newFile is not None and os.path.isfile(newFile):
-		if options.force:
-			log("{} already exists. Forcing recreation.".format(newFile), 
-					1, options)
+		# check if we are accidentally overwriting something
+		if newFile is not None and os.path.isfile(newFile):
+			if options.force:
+				log("{} already exists. Forcing recreation.".format(newFile), 
+						1, options)
+			else:
+				log("{} already exists. Use --force to recompute.".format(newFile), 
+						0, options)
+				return 1
+		if outputFile is not None:
+			out=open(outputFile, mode)
+		elif options.verbosity < 2:
+			# don't print stdout from subprocess
+			out=open(os.devnull, 'w')
 		else:
-			log("{} already exists. Use --force to recompute.".format(newFile), 
-					0, options)
-			return 1
-	if outputFile is not None:
-		out=open(outputFile, mode)
-	elif options.verbosity < 2:
-		# don't print stdout from subprocess
-		out=open(os.devnull, 'w')
-	else:
-		out=sys.stdout
-	subprocess.call(call, stdout=out, close_fds=close_fds, shell=shell)
+			out=sys.stdout
+		subprocess.call(call, stdout=out, close_fds=close_fds, shell=shell)
 	
-	# check the file was created, if given
-	assert(newFile is None or os.path.isfile(newFile))
+		# check the file was created, if given
+		assert(newFile is None or os.path.isfile(newFile))
+	except OSError as e:
+		log("OSError: has a dependency changed path? Try deleting nanomod/.config.json and try again.", 0, options)
+		raise e
 	return 0
 
 # create a directory, if it doesn't already exist
@@ -106,8 +111,7 @@ def multiprocessWrapper(func, args):
 	try:
 		return func(*args)
 	except Exception as e:
-		print('Caught exception in worker thread: {}({})'.format(func.__name__, 
-				", ".join(args)))
+		print('Caught exception in worker thread:')
 		traceback.print_exc()
 		print()
 		raise e

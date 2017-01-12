@@ -12,6 +12,7 @@
 
 import subprocess
 import os
+import json
 
 __version__ = '0.0.1'
 __version_info__ = tuple([int(num) for num in __version__.split('.')])
@@ -19,6 +20,7 @@ __version_info__ = tuple([int(num) for num in __version__.split('.')])
 __exe__ = {}
 # list of executables required by this package
 __prognames__ = ['poretools', 'bwa', 'samtools', 'nanopolish', 'nanonettrain']#, 'currennt']
+__config__ = ".config.json"
 
 # define path to an executable in global dictionary
 #
@@ -44,8 +46,22 @@ def checkExecutable(progname):
         		" set via the environment variable '{1}'.").format(progname, 
         		progname.upper()))
 
+def loadConfig():
+	with open(__config__, 'r') as fh:
+		config = json.load(fh)
+		for key in config['exe']:
+			__exe__[key] = config['exe'][key]
+
+def saveConfig(**config):
+	with open(__config__, 'w') as fh:
+		json.dump(config, fp=fh, indent=4)
+
 def init():
-	# initialise and check all executables
-	for p in __prognames__:
-		initExecutable(p)
-		checkExecutable(p)
+	if os.path.isfile(__config__):
+		loadConfig()
+	else:
+		# initialise and check all executables
+		for p in __prognames__:
+			initExecutable(p)
+			checkExecutable(p)
+		saveConfig(exe=__exe__)

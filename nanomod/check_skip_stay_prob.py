@@ -42,7 +42,6 @@ def checkProbs(filename):
 		skipProb = attrs["num_skips"]/numEvents
 		stayProb = attrs["num_stays"]/numEvents
 		stepProb = 1-skipProb-stayProb
-		#good = 1 if skipProb < 0.015957817368690529 and stayProb < 0.38317137809187279 and stepProb > 0.59949000388225082 else 0
 	return [skipProb, stayProb, stepProb]
 
 # get the empirical skip and stay probabilities for a set of reads
