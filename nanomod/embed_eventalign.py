@@ -37,7 +37,7 @@ from multiprocessing import Pool, cpu_count
 from shutil import copyfile
 
 from seq_tools import *
-from utils import log, makeDir
+from utils import log, makeDir, multiprocessWrapper
 from check_skip_stay_prob import getSkipStayConstraints
 
 __outdir_name__ = "nanomod" # subdirectory to be created in the output dir
@@ -276,7 +276,7 @@ def writeTempFiles(options, eventalign, refs):
 				outfile = getOutfile(fast5Name, options)
 				filename = os.path.join(options.tempDir, fast5Name)
 				if (not options.force) and os.path.isfile(outfile):
-					log(outfile + " already exists. Use --force to recompute.", 2, options)
+					log(outfile + " already exists. Use --force to recompute.", 1, options)
 					skip=True
 					premadeFilenames.append(fast5Name)
 					continue
@@ -339,31 +339,11 @@ def writeTrainfiles(options, trainData):
 					if pass_quality:
 						smallValFile.write(filename + "\n")
 
-# multiprocessing.Pool.map() wrapper for processRead
-# @args args an array of arguments for the function
-# @return return value of called function
 def processReadWrapper(args):
-	try:
-		return processRead(*args)
-	except Exception as e:
-		print('Caught exception in worker thread: {}({})'.format(func, 
-				", ".join(args)))
-		traceback.print_exc()
-		print()
-		raise e
+	return multiprocessingWrapper(processRead, args)
 
-# multiprocessing.Pool.map() wrapper for checkPremade
-# @args args an array of arguments for the function
-# @return return value of called function
 def checkPremadeWrapper(args):
-	try:
-		return checkPremade(*args)
-	except Exception as e:
-		print('Caught exception in worker thread: {}({})'.format(func, 
-				", ".join(args)))
-		traceback.print_exc()
-		print()
-		raise e
+	return multiprocessingWrapper(checkPremade, args)
 
 # main script: embed labels to reference genome into fast5 files
 #
@@ -383,11 +363,11 @@ def embedEventalign(options, fasta, eventalign):
 	pool = Pool(options.threads)
 	log("Embedding labels into {} fast5 files...".format(len(filenames)), 1,
 			options)
-	trainData = pool.map(processRead, 
-			[[options, idx, i] for i in filenames])
+	trainData = pool.map(multiprocessWrapper, 
+			[[processRead, options, idx, i] for i in filenames])
 	log(("Adding data for {} premade fast5" 
 			"files...").format(len(premadeFilenames)), 1, options)
-	trainData.extend(pool.map(checkPremadeWrapper, [[options, i] for i in premadeFilenames]))
+	trainData.extend(pool.map(multiprocessWrapper, [[checkPremade, options, i] for i in premadeFilenames]))
 	log(("Saving datasets for {} total fast5" 
 			"files...").format(len(trainData)), 1, options)
 	writeTrainfiles(options, trainData)
