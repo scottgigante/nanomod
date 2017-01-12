@@ -2,8 +2,7 @@ temp
 data
 install.sh
 nanomod/*.pyc
-.DS_Store
-._.DS_Store
+.*
 nanomod/scripts/.*
 nanomod/test/.*
 nanomod/.*
