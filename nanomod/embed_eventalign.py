@@ -37,10 +37,8 @@ from multiprocessing import Pool, cpu_count
 from shutil import copyfile
 
 from seq_tools import *
-from utils import log, makeDir, multiprocessWrapper
+from utils import callSubProcess, log, makeDir, multiprocessWrapper
 from check_skip_stay_prob import getSkipStayConstraints
-
-__outdir_name__ = "nanomod" # subdirectory to be created in the output dir
 
 # get the path of the output file corresponding to a fast5 file
 #
@@ -48,7 +46,7 @@ __outdir_name__ = "nanomod" # subdirectory to be created in the output dir
 # @args options Namespace object from argparse
 # @return path to output fast5 file
 def getOutfile(fast5, options):
-	return os.path.join(options.outPrefix, __outdir_name__, fast5)
+	return os.path.join(options.outPrefix, fast5)
 
 # write a labelled fast5 file
 #
@@ -64,7 +62,7 @@ def getOutfile(fast5, options):
 # @args kmer Length of kmer labels
 # @return String representing whether fast5 file should be train or val data
 def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, 
-		chromosome, forward, numSkips, numStays, kmer):
+		chromosome, forward, numSkips, numStays, kmer, genome):
 	
 	# all events are considered good emissions - bad idea?
 	events = append_fields(events, 'good_emission', events["kmer"] != 'X'*kmer)
@@ -83,6 +81,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 	filename = fast5Path.split('/')[-1]
 	newPath = getOutfile(filename, options)
 	copyfile(fast5Path, newPath)
+	log("Saving {}".format(filename), 2, options)
 	with h5py.File(newPath,'r+') as fast5:
 		analysesGroup = fast5.get("Analyses")
 		alignToRefGroup = analysesGroup.create_group("AlignToRef")
@@ -113,9 +112,9 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 		fastaGroup = alignGroup.create_group("Aligned_template")
 		# our current eventalign files don't have the same chromosome name!???
 		# TODO: don't do this pls
-		fasta = options.genome["Chromosome"].format("fasta")
+		fasta = genome["Chromosome"].format("fasta")
 		fastaGroup.create_dataset("Fasta", 
-				data=options.genome["Chromosome"].format("fasta"))
+				data=genome["Chromosome"].format("fasta"))
 		
 		# create attrs
 		summaryGroup = alignGroup.create_group("Summary")
@@ -135,7 +134,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 # @args idx headers index of eventalign file
 # @args fast5Path path to original fast5 file
 # @return two-element array containing basename of fast5 file and string reference to either training or validation dataset
-def processRead(options, idx, fast5Path):
+def processRead(options, idx, fast5Path, genome, modified):
 	
 	fast5File = fast5Path.split('/')[-1]
 	eventalign = np.load(os.path.join(options.tempDir, fast5File + ".npy"))
@@ -189,7 +188,7 @@ def processRead(options, idx, fast5Path):
 		if not forward:
 			seq = reverseComplement(seq)
 		
-		if options.methyl:
+		if modified:
 			unmethyl_seq = seq
 			seq = methylateSeq(seq)
 		
@@ -206,7 +205,9 @@ def processRead(options, idx, fast5Path):
 		events["kmer"][int(line[idx['event_index']])] = seq
 	
 	fast5.close()
-	pass_quality = writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, chromosome, forward, numSkips, numStays, kmer)
+	pass_quality = writeFast5(options, events, fast5Path, initial_ref_index, 
+			last_ref_index, chromosome, forward, numSkips, numStays, kmer, 
+			genome)
 	return [fast5File, pass_quality]
 
 # write temporary .npy files to split eventalign tsv file into chunks 
@@ -254,6 +255,7 @@ def writeTempFiles(options, eventalign, refs):
 				if tmp is not None and tmp != []:
 					try:
 						np.save(filename,tmp)
+						log("Saving {}.npy\n{}".format(filename, tmp[0]), 2, options)
 						n += 1
 					except IOError as e:
 						log("Failed to write {}.npy: {}".format(filename, e), 0, 
@@ -304,6 +306,7 @@ def writeTempFiles(options, eventalign, refs):
 		# last one gets missed
 		if tmp is not None and tmp != []:
 			np.save(filename,tmp)
+			log("Saving {}.npy\n{}".format(filename, tmp[0]), 2, options)
 		
 	return filenames, idx, premadeFilenames
 
@@ -325,9 +328,9 @@ def checkPremade(options, filename):
 # @args options Namespace object from argparse
 # @args trainData Dataset consisting or two-element arrays of filename and dataset to which file should be added (either "train" or "val")
 # @return None
-def writeTrainfiles(options, trainData):
-	trainFilename = options.outPrefix + ".train.txt"
-	valFilename = options.outPrefix + ".val.txt"
+def writeTrainfiles(options, trainData, outPrefix):
+	trainFilename = outPrefix + ".train.txt"
+	valFilename = outPrefix + ".val.txt"
 	
 	with open(trainFilename, 'w') as trainFile, open(valFilename, 'w') as valFile, open(trainFilename + ".small", 'w') as smallTrainFile,	open(valFilename + ".small", 'w') as smallValFile:
 
@@ -362,25 +365,41 @@ def checkPremadeWrapper(args):
 # @args fasta Fasta filename corresponding to reads (MUST be produced by poretools)
 # @args eventalign Filename of eventalign tsv output
 # @return None
-def embedEventalign(options, fasta, eventalign):
-	makeDir(os.path.join(options.outPrefix, __outdir_name__))
+def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
+	output = "{}.train.txt.small".format(options.outPrefix)
+	if callSubProcess("touch {}".format(output),
+			options, newFile=output) == 1:
+		return 1
+	makeDir(options.outPrefix)
+	
 	log("Loading fast5 names and references...", 1, options)
 	refs = loadRef(fasta)
-	options.genome = loadGenome(options.genome)
-	log("Calculating skip/stay count constraints...", 1, options)
-	options.constraints = getSkipStayConstraints(options.reads, 
-			options.dataFraction)
+	genome = loadGenome(options.genome)
+	
+	if options.random:
+		# no point populating constrained files, we will overwrite later
+		options.constraints = {'maxSkips' : 0,
+			'maxStays' : 0, 
+			'minSteps' : 1 }
+	else:
+		log("Calculating skip/stay count constraints...", 1, options)
+		options.constraints = getSkipStayConstraints(reads, 
+				options.dataFraction)
+	
 	log("Splitting eventalign into separate files...", 1, options)
 	filenames, idx, premadeFilenames = writeTempFiles(options, eventalign, refs)
 	pool = Pool(options.threads)
+	
 	log("Embedding labels into {} fast5 files...".format(len(filenames)), 1,
 			options)
 	trainData = pool.map(processReadWrapper, 
-			[[options, idx, i] for i in filenames])
+			[[options, idx, i, genome, modified] for i in filenames])
+	
 	log(("Adding data for {} premade fast5" 
 			"files...").format(len(premadeFilenames)), 1, options)
 	trainData.extend(pool.map(checkPremadeWrapper, 
 			[[options, i] for i in premadeFilenames]))
+	
 	log(("Saving datasets for {} total fast5" 
 			"files...").format(len(trainData)), 1, options)
-	writeTrainfiles(options, trainData)
+	writeTrainfiles(options, trainData, outPrefix)

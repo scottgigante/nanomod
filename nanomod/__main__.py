@@ -92,48 +92,85 @@ def parseArgs(argv):
 	
 	#command line options
 	parser = argparse.ArgumentParser(prog="nanomod")
-	parser.add_argument("-r","--reads",dest="reads", required=True, 
-			help="Directory in which fast5 reads are stored")
+	parser.add_argument("-c","--canonical-reads", dest="canonicalReads", 
+			required=True, 
+			help="Directory in which canonical-base fast5 reads are stored")
+	parser.add_argument("-m", "--modified-reads", dest="modifiedReads",
+			required=True, 
+			help="Directory in which modified-base fast5 reads are stored")
 	parser.add_argument("-g", "--genome", required=True, 
-			dest="genome", help="reference genome in fasta format")
+			dest="genome", help="Reference genome in fasta format")
 	parser.add_argument("-o", "--output-prefix", dest="outPrefix", 
-			required=True, help="prefix for nanomod output files")
-	parser.add_argument("-k", "--kmer", type=int, default=3,
-			help="Length of kmer for network training.")
+			required=True, help="Prefix for nanomod output files")
+	parser.add_argument("-k", "--kmer", type=int, default=5,
+			help="Length of kmer for network training")
 	parser.add_argument("-t", "--threads", type=int, default=cpu_count(), 
 			dest="threads", 
-			help="number of threads to be used in multiprocessing")
+			help="Number of threads to be used in multiprocessing")
 	parser.add_argument("-p", "--parallel-sequences", default=125, 
 			type=int, dest="parallelSequences", 
-			help="Number of parallel threads of execution in GPU training.")
+			help="Number of parallel threads of execution in GPU training")
 	parser.add_argument("-v","--verbose", default=0, action="count", 
-			dest="verbosity", help=("can be used multiple times (e.g., -vv) "
+			dest="verbosity", help=("Can be used multiple times (e.g., -vv) "
 			"for greater levels of verbosity."))
 	parser.add_argument("--temp-dir", 
 			default="{}/nanomod".format(tempfile.gettempdir()), 
-			dest="tempDir", help="directory for nanomod temporary files")
+			dest="tempDir", help="Directory for nanomod temporary files")
 	parser.add_argument("--nanopolish-models", 
 			default="models/nanopolish_models.fofn", dest="nanopolishModels", 
-			help=("nanopolish models for eventalign." 
-			" Note: will be copied to current working directory"))
+			help=("Nanopolish models for eventalign. " 
+			"Note: will be copied to current working directory"))
 	parser.add_argument("--currennt-template", dest="currenntTemplate",
 			default="models/default_template.json", 
-			help="Template file for CURRENNT network architecture.")
+			help="Template file for CURRENNT network architecture")
 	parser.add_argument("--force", default=False, action="store_true", 
-			dest="force", help="force recreation of extant files")
+			dest="force", help="Force recreation of extant files")
+			# TODO: make this ranked? eg force 1, force 8?
 	parser.add_argument("--num-reads", type=int, default=-1, dest="numReads", 
-			help="limit the number of reads to be computed")
+			help="Limit the number of reads to be analysed")
 	parser.add_argument("--val-fraction", type=float, default=0.05, 
-			dest="valFraction", help="fraction of data used for validation set")
+			dest="valFraction", help="Fraction of data used for validation set")
 	parser.add_argument("--data-fraction", type=float, default=1,
-			dest="dataFraction", help="fraction of data to be sent to nanonet")
-	parser.add_argument("--methyl", default=False, action="store_true", 
-			dest="methyl")
+			dest="dataFraction", help="Fraction of data to be sent to nanonet")
+	parser.add_argument("--random", default=False, action="store_true",
+			help="Choose reads for nanonet randomly instead of by quality")
 	
 	#parse command line options
 	options = parser.parse_args()
 	
 	return options
+
+# build training set for a single minION run
+#
+# @args options Namespace from argparse
+# @args reads Directory for fast5 reads
+# @args outPrefix Prefix for output files
+def buildTrainingSet(options, reads, outPrefix, modified=False):
+	fasta, eventalign = buildEventalign(options, reads, outPrefix)
+	embedEventalign(options, fasta, eventalign, reads, outPrefix, modified)
+	if options.random:
+		# overwrite small training sets with random selection
+		callSubProcess(("./nanomod/scripts/select_data_fraction.sh {0} "
+				"{1}.train.txt {1}.val.txt").format(options.dataFraction,
+				outPrefix), options)
+
+def combineTrainingSets(options, t1, t2, outPrefix):
+	trainFile1 = "{}.train.txt.small".format(t1)
+	trainFile2 = "{}.train.txt.small".format(t2)
+	valFile1 = "{}.val.txt.small".format(t1)
+	valFile2 = "{}.val.txt.small".format(t2)
+	trainFileCombined = "{}.train.txt.small".format(outPrefix)
+	valFileCombined = "{}.val.txt.small".format(outPrefix)
+	callSubProcess("cat {}".format(trainFile1), options, 
+			outputFile=trainFileCombined, mode='w')
+	# skip header second time
+	callSubProcess("tail -n +2 {}".format(trainFile2), options, 
+			outputFile=trainFileCombined, mode='a')
+	callSubProcess("cat {}".format(valFile1), options, 
+			outputFile=valFileCombined, mode='w')
+	# skip header second time
+	callSubProcess("tail -n +2 {}".format(valFile2), options, 
+			outputFile=valFileCombined, mode='a')
 
 # run main script
 # 
@@ -143,11 +180,14 @@ def run(argv):
 	options = parseArgs(argv)
 	initialiseArgs(options)
 	try:
-		fasta, eventalign = buildEventalign(options)
-		embedEventalign(options, fasta, eventalign)
-		#callSubProcess(("./scripts/select_data_fraction.sh {0} {1}.train.txt"
-		#		" {1}.val.txt").format(options.dataFraction, options.outPrefix), 
-		#		options)
+		canonicalPrefix = "{}.canonical".format(options.outPrefix)
+		modifiedPrefix = "{}.modified".format(options.outPrefix)
+		# TODO: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
+		buildTrainingSet(options, options.canonicalReads, canonicalPrefix)
+		buildTrainingSet(options, options.modifiedReads, modifiedPrefix, 
+				modified=True)
+		combineTrainingSets(options, canonicalPrefix, modifiedPrefix, 
+				options.outPrefix)
 		#trainNanonet(options)
 	finally:
 		# we'd better clean up after ourselves, even if it crashes
