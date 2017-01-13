@@ -17,6 +17,8 @@
 #                                                                              #
 # seq_tools.py: perform elementary DNA sequence manipulation.                  #
 #                                                                              #
+# TODO: include wildcard expansion                                             #
+#                                                                              #
 # Author: Scott Gigante                                                        #
 # Contact: gigante.s@wehi.edu.au                                               #
 # Date: 06 Jan 2017                                                            #
@@ -26,6 +28,24 @@
 from Bio import SeqIO, Seq
 import os
 
+wildcards = { 'W' : ['A', 'T'],
+			  'S' : ['C','G'],
+			  'M' : ['A','C'],
+			  'K' : ['G','T'],
+			  'R' : ['A','G'],
+			  'Y' : ['C','T'],
+			  'B' : ['G','C','T'],
+			  'H' : ['A','C','T'],
+			  'H' : ['A','G','T'],
+			  'V' : ['A','G','C'],
+			  'N' : ['A','G','C','T'] }
+
+# explode wildcards in sequence motifs
+# @param sequenceMotifs Sequences to be exploded
+def explodeMotifs(sequenceMotifs):
+	# NOT YET IMPLEMENTED
+	exit(1)
+	
 # create a dictionary linking read names to fast5 file paths
 #
 # @args fasta Filename of the fasta file created by poretools
@@ -45,16 +65,16 @@ def loadRef(fasta):
 #
 # @args filename Fasta filename of reference genome
 # @return dictionary of SeqIO records corresponding to each contig of reference
-def loadGenome(filename, modified=False):
+def loadGenome(options, modified=False):
 	genome = {}
-	with open(filename, "rU") as handle:
+	with open(options.genome, "rU") as handle:
 		for record in SeqIO.parse(handle, "fasta"):
 			contig = { 'id' : record.id }
 			reverseSeq = Seq.reverse_complement(record.seq) 
 			Seq.reverse_complement(reverseSeq)
 			if modified:
-				record.seq = Seq.Seq(methylateSeq(str(record.seq)))
-				reverseSeq = Seq.Seq(methylateSeq(str(reverseSeq)))
+				record.seq = Seq.Seq(modifySeq(options, str(record.seq)))
+				reverseSeq = Seq.Seq(modifySeq(options, str(reverseSeq)))
 			contig['seq'] = record.seq
 			contig['reverseSeq'] = reverseSeq
 			contig['record'] = record
@@ -79,21 +99,6 @@ def getKmer(genome, chromosome, pos, kmer, forward):
 		stop_pos = -pos
 	return str(seq[start_pos:stop_pos])
 
-# reverse complement a sequence
-#
-# @args seq The sequence to be reverse-complemented
-# @return Reverse-complemented sequence
-def reverseComplement(seq):
-	# reverse
-	seq = seq[::-1]	
-	# complement
-	# from http://stackoverflow.com/questions/6116978/python-replace-multiple-strings
-	# in order to avoid double changes, use symbols first
-	repls = ('A', '1'), ('T', '2'), ('C', '3'), ('G', '4')
-	seq = reduce(lambda a, kv: a.replace(*kv), repls, seq)
-	repls = ('1', 'T'), ('2', 'A'), ('3', 'G'), ('4', 'C')
-	return reduce(lambda a, kv: a.replace(*kv), repls, seq)
-
 # apply CpG methylation to a sequence
 #
 # TODO: can we turn this into a more generalised method? how?
@@ -101,16 +106,31 @@ def reverseComplement(seq):
 #
 # @args seq The sequence to be methylated
 # @return The methylated sequence
-def methylateSeq(seq):
+def modifySeq(options, seq):
 	# simply replacing CG with MG leaves out sequences ending in C that could be methylated
 	# as a result, we can't use the last base of the sequence effectively	
-	return seq.replace("CG","MG")
+	return seq.replace(options.sequenceMotif[0],options.sequenceMotif[1])
+
+# replace a pattern only if at the start of a string
+# http://code.activestate.com/recipes/577252-lreplace-and-rreplace-replace-the-beginning-and-en/
+def lreplace(pattern, sub, string):
+    return sub + string[len(pattern):] if string.startswith(pattern) else string
+
+# replace a pattern only if at the end of a string
+def rreplace(pattern, sub, string):
+    return string[:-len(pattern)] + sub if string.endswith(pattern) else string
 
 # undo CpG methylation to a sequence
+# assume positive site recognition at either end if possible
+# allows wildcards UY
 #
 # @args seq The sequence to be demethylated
 # @return The demethylated sequence
-def demethylateSeq(seq):
-	if seq[-1] == 'M':
-		seq = seq[:-2] + 'C'
-	return seq.replace("MG","CG")
+def unmodifySeq(seq, sequenceMotif):
+	# we have to check partial matches at either end
+	pattern = sequenceMotif[1]
+	sub = sequenceMotif[0]
+	for i in range(1, len(pattern)):
+		seq = lreplace(pattern[i:], sub[i:], seq)
+		seq = rreplace(pattern[:i], sub[:i], seq)
+	return seq.replace(pattern,sub)

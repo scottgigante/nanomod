@@ -45,6 +45,10 @@ def initialiseArgs(options):
 	makeDir(options.tempDir)
 	makeDir(options.outPrefix)
 	
+	# make sure sequenceMotif is uppercase
+	for i in range(len(options.sequenceMotif)):
+		options.sequenceMotif[i] = options.sequenceMotif[i].upper()
+	
 	# move models files to current working directory for eventalign
 	modelsFile = os.path.basename(options.nanopolishModels)
 	cwd = os.getcwd()
@@ -102,6 +106,9 @@ def parseArgs(argv):
 			dest="genome", help="Reference genome in fasta format")
 	parser.add_argument("-o", "--output-prefix", dest="outPrefix", 
 			required=True, help="Prefix for nanomod output files")
+	parser.add_argument("-s", "--sequence-motif", dest="sequenceMotif",
+			nargs=2, required=True, 
+			help="Motif of canonical and modified site (e.g., -s CG MG)")
 	parser.add_argument("-k", "--kmer", type=int, default=5,
 			help="Length of kmer for network training")
 	parser.add_argument("-t", "--threads", type=int, default=cpu_count(), 

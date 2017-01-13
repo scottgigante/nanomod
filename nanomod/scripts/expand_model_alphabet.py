@@ -36,6 +36,7 @@ kmer_len = 5
 
 model_orig = "models/r9_template.json"
 model_new = "models/r9_template_methyl.json"
+sequenceMotif = ["CG", "MG"]
 
 alphabet_orig = "AGCT"
 alphabet_new = "AGCTM"
