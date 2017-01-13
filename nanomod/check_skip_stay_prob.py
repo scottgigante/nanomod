@@ -64,7 +64,8 @@ def getSkipStayConstraints(dir, proportion):
 	for read in probs.transpose():
 		cutoffs.append(max((read[0] - skipMean)/skipStdv, (read[1] - stayMean)/stayStdv, (stepMean - read[2])/stepStdv))
 	cutoffs.sort()
-	numStdvs = cutoffs[int(len(cutoffs)*proportion)]
+	numStdvs = cutoffs[int((len(cutoffs)-1)*proportion)] 
+	# want number between 0 and length - 1
 	
 	maxSkips = skipMean + numStdvs * skipStdv
 	maxStays = stayMean + numStdvs * stayStdv

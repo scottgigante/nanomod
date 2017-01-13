@@ -18,7 +18,7 @@
 # embed_eventalign.py: use eventalign data to label individual fast5 reads     #
 # in order to feed labelled fast5 files into neural network training.          #
 #                                                                              #
-# TODO: remove Numpy FutureWarning from selecting fields in structured array.  #
+# TODO: deal with secondary / auxiliary reads better                           #
 #                                                                              #
 # Author: Scott Gigante                                                        #
 # Contact: gigante.s@wehi.edu.au                                               #
@@ -110,11 +110,9 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 		# create alignment group
 		alignGroup = analysesGroup.create_group("Alignment")
 		fastaGroup = alignGroup.create_group("Aligned_template")
-		# our current eventalign files don't have the same chromosome name!???
-		# TODO: don't do this pls
-		fasta = genome["Chromosome"].format("fasta")
+		fasta = genome[chromosome]['record'].format("fasta")
 		fastaGroup.create_dataset("Fasta", 
-				data=genome["Chromosome"].format("fasta"))
+				data=genome[chromosome]['record'].format("fasta"))
 		
 		# create attrs
 		summaryGroup = alignGroup.create_group("Summary")
@@ -169,7 +167,6 @@ def processRead(options, idx, fast5Path, genome, modified):
 			# now reading complement of the same read - skip
 			break
 		
-		seq = line[idx['ref_kmer']]
 		current_ref_index = int(line[idx['ref_pos']])
 		
 		if not start:
@@ -185,12 +182,7 @@ def processRead(options, idx, fast5Path, genome, modified):
 			seq_pos_diff = abs(current_ref_index - last_ref_index)
 			seq_pos = last_seq_pos + seq_pos_diff
 		
-		if not forward:
-			seq = reverseComplement(seq)
-		
-		if modified:
-			unmethyl_seq = seq
-			seq = methylateSeq(seq)
+		seq = getKmer(genome, chromosome, current_ref_index, kmer, forward)
 		
 		if last_ref_index == current_ref_index:
 			numStays += 1
@@ -243,8 +235,8 @@ def writeTempFiles(options, eventalign, refs):
 		current_read_name = ""
 		skip=True
 		tmp=None
-		filenames = []
-		premadeFilenames = []
+		filenames = set()
+		premadeFilenames = set()
 		n=0
 		
 		for line in reader:
@@ -255,7 +247,7 @@ def writeTempFiles(options, eventalign, refs):
 				if tmp is not None and tmp != []:
 					try:
 						np.save(filename,tmp)
-						log("Saving {}.npy\n{}".format(filename, tmp[0]), 2, options)
+						log("Saving {}.npy".format(filename), 2, options)
 						n += 1
 					except IOError as e:
 						log("Failed to write {}.npy: {}".format(filename, e), 0, 
@@ -287,17 +279,17 @@ def writeTempFiles(options, eventalign, refs):
 							2, options)
 					skip=True
 					n += 1
-					premadeFilenames.append(fast5Name)
+					premadeFilenames.add(fast5Name)
 					continue
 				elif (not options.force) and os.path.isfile(filename + ".npy"):
 					log(("{}.npy already exists. Use --force to " 
 							"recompute.").format(filename), 2, options)
 					skip=True
-					filenames.append(fast5Path)
+					filenames.add(fast5Path)
 					assert(tmp == [])
 					continue
 				
-				filenames.append(fast5Path)
+				filenames.add(fast5Path)
 				skip=False
 			
 			assert(skip==False)
@@ -306,7 +298,7 @@ def writeTempFiles(options, eventalign, refs):
 		# last one gets missed
 		if tmp is not None and tmp != []:
 			np.save(filename,tmp)
-			log("Saving {}.npy\n{}".format(filename, tmp[0]), 2, options)
+			log("Saving {}.npy".format(filename), 2, options)
 		
 	return filenames, idx, premadeFilenames
 
@@ -374,7 +366,7 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
 	
 	log("Loading fast5 names and references...", 1, options)
 	refs = loadRef(fasta)
-	genome = loadGenome(options.genome)
+	genome = loadGenome(options.genome, modified)
 	
 	if options.random:
 		# no point populating constrained files, we will overwrite later

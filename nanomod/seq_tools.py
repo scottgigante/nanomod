@@ -23,7 +23,7 @@
 #                                                                              #
 ################################################################################
 
-from Bio import SeqIO
+from Bio import SeqIO, Seq
 import os
 
 # create a dictionary linking read names to fast5 file paths
@@ -45,12 +45,39 @@ def loadRef(fasta):
 #
 # @args filename Fasta filename of reference genome
 # @return dictionary of SeqIO records corresponding to each contig of reference
-def loadGenome(filename):
+def loadGenome(filename, modified=False):
 	genome = {}
 	with open(filename, "rU") as handle:
 		for record in SeqIO.parse(handle, "fasta"):
-			genome[record.id] = record
+			contig = { 'id' : record.id }
+			reverseSeq = Seq.reverse_complement(record.seq) 
+			Seq.reverse_complement(reverseSeq)
+			if modified:
+				record.seq = Seq.Seq(methylateSeq(str(record.seq)))
+				reverseSeq = Seq.Seq(methylateSeq(str(reverseSeq)))
+			contig['seq'] = record.seq
+			contig['reverseSeq'] = reverseSeq
+			contig['record'] = record
+			genome[record.id] = contig
 	return genome
+
+# get the kmer at a particular place in the genome
+# @param genome the genome dictionary from loadGenome
+# @param chromosome Contig id
+# @param pos Position on forward reference
+# @param kmer Kmer length
+# @param forward Boolean marker of forward or reverse read
+# @return Kmer as a string
+def getKmer(genome, chromosome, pos, kmer, forward):
+	stop_pos = pos + kmer
+	if forward:
+		seq = genome[chromosome]['seq']
+		start_pos = pos
+	else:
+		seq = genome[chromosome]['reverseSeq']
+		start_pos = -stop_pos
+		stop_pos = -pos
+	return str(seq[start_pos:stop_pos])
 
 # reverse complement a sequence
 #
