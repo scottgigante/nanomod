@@ -28,6 +28,7 @@ import os
 import sys
 import subprocess
 import traceback
+import json
 
 __log_levels__ = ['[warning] ','[debug] ','[log] ']
 
@@ -102,6 +103,15 @@ def makeDir(dir):
 	except OSError:
 		# already exists
 		pass
+
+def loadJson(filename):
+	with open(filename, 'r') as inFh:
+		data = json.load(inFh)
+	return data
+
+def saveJson(filename, data):
+	with open(filename, 'w') as outFh:
+		json.dump(data, fp=outFh, indent=4)
 		
 # multiprocessing.Pool.map() wrapper for functions taking more than one argument
 # @args func the function to be called

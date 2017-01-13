@@ -6,3 +6,4 @@ nanomod/*.pyc
 nanomod/scripts/.*
 nanomod/test/.*
 nanomod/.*
+models/*.json

@@ -31,6 +31,8 @@ import json
 import sys
 import numpy as np
 
+from utils import callSubProcess
+
 def get_parser():
     parser = argparse.ArgumentParser(
         description='Convert currennt json network file into pickle. Makes assumptions about meta data.',
@@ -209,16 +211,26 @@ def numpy_to_network(in_network):
     		 "weights" : weights,
     		 "meta" : in_network.meta }
 
+def runConvertPickle(in_filename, out_filename):
+	try:
+		in_network = np.load(in_filename).item()
+	except:
+		sys.stderr.write('Failed to read from {}.\n'.format(in_filename))
+		return 1
+	
+	network = numpy_to_network(in_network)
+	with open(out_filename, 'w') as out_network:
+		json.dump(network, fp=out_network, indent=4)
+	return 0
+
+def convertPickle(options):
+	if callSubProcess("touch {}".format(options.currenntTemplate),
+			options, newFile=options.currenntTemplate) == 1:
+		return 1
+	return runConvertPickle(options.nanonetTemplate, options.currenntTemplate)
+	
 
 if __name__ == '__main__':
-    args = get_parser().parse_args() 
-
-    try:
-        in_network = np.load(args.input).item()
-    except:
-        sys.stderr.write('Failed to read from {}.\n'.format(args.input))
-        exit(1)
-
-    network = numpy_to_network(in_network)
-    with open(args.output, 'w') as out_network:
-    	json.dump(network, fp=out_network, indent=4)
+    args = get_parser().parse_args()
+    runConvertPickle(args.input, args.output)
+    

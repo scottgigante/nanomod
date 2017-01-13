@@ -28,6 +28,8 @@ import shutil
 from utils import log, makeDir, callSubProcess
 from build_eventalign import buildEventalign
 from embed_eventalign import embedEventalign
+from pickle_to_currennt import convertPickle
+from expand_model_alphabet import expandModelAlphabet
 from . import init
 
 # create directories, move things to the right place, etc
@@ -68,6 +70,14 @@ def initialiseArgs(options):
 				shutil.copy(os.path.join(modelsPath, model), 
 						os.path.join(cwd, model))
 		shutil.copy(options.nanopolishModels, newModels)
+	
+	# convert ONT model to json
+	options.currenntTemplate = "{}.json".format(options.nanonetTemplate)
+	convertPickle(options)
+	
+	# expand model to include modifications
+	options.expandedTemplate = "{}.mod.json".format(options.nanonetTemplate)
+	expandModelAlphabet(options)
 
 # move temporary files out of current working directory, delete temp directory
 #
@@ -127,9 +137,9 @@ def parseArgs(argv):
 			default="models/nanopolish_models.fofn", dest="nanopolishModels", 
 			help=("Nanopolish models for eventalign. " 
 			"Note: will be copied to current working directory"))
-	parser.add_argument("--currennt-template", dest="currenntTemplate",
-			default="models/default_template.json", 
-			help="Template file for CURRENNT network architecture")
+	parser.add_argument("--nanonet-template", dest="nanonetTemplate",
+			default="models/default_template.npy", 
+			help="Nanonet model file for network initialisation")
 	parser.add_argument("--force", default=False, action="store_true", 
 			dest="force", help="Force recreation of extant files")
 			# TODO: make this ranked? eg force 1, force 8?
