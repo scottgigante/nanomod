@@ -358,17 +358,17 @@ def checkPremadeWrapper(args):
 # @args eventalign Filename of eventalign tsv output
 # @return None
 def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
-	output = "{}.train.txt.small".format(options.outPrefix)
-	if callSubProcess("touch {}".format(output),
-			options, newFile=output) == 1:
-		return 1
+	output = "{}.train.txt.small".format(outPrefix)
+	#if callSubProcess("touch {}".format(output),
+	#		options, newFile=output) == 1:
+	#	return 1
 	makeDir(options.outPrefix)
 	
 	log("Loading fast5 names and references...", 1, options)
 	refs = loadRef(fasta)
 	genome = loadGenome(options, modified)
 	
-	if options.random:
+	if "random" in options.selectMode:
 		# no point populating constrained files, we will overwrite later
 		options.constraints = {'maxSkips' : 0,
 			'maxStays' : 0, 
@@ -376,7 +376,8 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
 	else:
 		log("Calculating skip/stay count constraints...", 1, options)
 		options.constraints = getSkipStayConstraints(reads, 
-				options.dataFraction)
+				options.dataFraction, options.selectMode)
+		log(str(options.constraints), 2, options)
 	
 	log("Splitting eventalign into separate files...", 1, options)
 	filenames, idx, premadeFilenames = writeTempFiles(options, eventalign, refs)

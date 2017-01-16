@@ -32,6 +32,9 @@ import numpy as np
 from multiprocessing import Pool
 import json
 
+from . import __modes__
+from utils import log
+
 def getStats(ary):
 	return np.mean(ary), np.std(ary)
 
@@ -47,10 +50,14 @@ def checkProbs(filename):
 # get the empirical skip and stay probabilities for a set of reads
 # @param dir The directory to search for fast5 files
 # @param proportion The desired proportion of reads to be retained
+# @param mode Choose any or all of 'skip', 'stay', and 'step'
 # @return maxSkips
 # @return maxStays
 # @return minSteps
-def getSkipStayConstraints(dir, proportion):
+def getSkipStayConstraints(dir, proportion, mode=__modes__):
+	for m in mode:
+		if m not in __modes__:
+			log("Mode {} not recognised", 0, options)
 	files = [os.path.join(dir,file) for file in os.listdir(dir) if file.endswith(".fast5")]
 	
 	p = Pool()
@@ -62,7 +69,14 @@ def getSkipStayConstraints(dir, proportion):
 	
 	cutoffs = []
 	for read in probs.transpose():
-		cutoffs.append(max((read[0] - skipMean)/skipStdv, (read[1] - stayMean)/stayStdv, (stepMean - read[2])/stepStdv))
+		deviations = []
+		if "skip" in mode:
+			deviations.append((read[0] - skipMean)/skipStdv)
+		if "stay" in mode:
+			deviations.append((read[1] - stayMean)/stayStdv)
+		if "step" in mode:
+			deviations.append((stepMean - read[2])/stepStdv)
+		cutoffs.append(max(deviations))
 	cutoffs.sort()
 	numStdvs = cutoffs[int((len(cutoffs)-1)*proportion)] 
 	# want number between 0 and length - 1
@@ -71,9 +85,9 @@ def getSkipStayConstraints(dir, proportion):
 	maxStays = stayMean + numStdvs * stayStdv
 	minSteps = stepMean - numStdvs * stepStdv
 	
-	return {'maxSkips' : maxSkips,
-			'maxStays' : maxStays, 
-			'minSteps' : minSteps }
+	return {'maxSkips' : maxSkips if "skip" in mode else 1,
+			'maxStays' : maxStays if "stay" in mode else 1, 
+			'minSteps' : minSteps if "step" in mode else 0}
 
 if __name__ == "__main__":
 	print getSkipStayConstraints(sys.argv[1], sys.argv[2])

@@ -21,6 +21,7 @@ __exe__ = {}
 # list of executables required by this package
 __prognames__ = ['poretools', 'bwa', 'samtools', 'nanopolish', 'nanonettrain']#, 'currennt']
 __config__ = ".config.json"
+__modes__ = ["skip", "stay", "step"]
 
 # define path to an executable in global dictionary
 #

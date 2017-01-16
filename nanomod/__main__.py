@@ -30,7 +30,7 @@ from build_eventalign import buildEventalign
 from embed_eventalign import embedEventalign
 from pickle_to_currennt import convertPickle
 from expand_model_alphabet import expandModelAlphabet
-from . import init
+from . import init, __modes__
 
 # create directories, move things to the right place, etc
 #
@@ -110,14 +110,14 @@ def parseArgs(argv):
 			required=True, 
 			help="Directory in which canonical-base fast5 reads are stored")
 	parser.add_argument("-m", "--modified-reads", dest="modifiedReads",
-			required=True, 
+			required=False, 
 			help="Directory in which modified-base fast5 reads are stored")
 	parser.add_argument("-g", "--genome", required=True, 
 			dest="genome", help="Reference genome in fasta format")
 	parser.add_argument("-o", "--output-prefix", dest="outPrefix", 
 			required=True, help="Prefix for nanomod output files")
 	parser.add_argument("-s", "--sequence-motif", dest="sequenceMotif",
-			nargs=2, required=True, 
+			nargs=2, required=False, default=["CG","MG"], 
 			help="Motif of canonical and modified site (e.g., -s CG MG)")
 	parser.add_argument("-k", "--kmer", type=int, default=5,
 			help="Length of kmer for network training")
@@ -149,8 +149,9 @@ def parseArgs(argv):
 			dest="valFraction", help="Fraction of data used for validation set")
 	parser.add_argument("--data-fraction", type=float, default=1,
 			dest="dataFraction", help="Fraction of data to be sent to nanonet")
-	parser.add_argument("--random", default=False, action="store_true",
-			help="Choose reads for nanonet randomly instead of by quality")
+	parser.add_argument("--select-mode", default=__modes__, nargs="*",
+			help=("Method for choosing reads to send to nanonet; choose from "
+			"'random', {}").format(", ".join(__modes__)), dest="selectMode")
 	
 	#parse command line options
 	options = parser.parse_args()
@@ -165,7 +166,7 @@ def parseArgs(argv):
 def buildTrainingSet(options, reads, outPrefix, modified=False):
 	fasta, eventalign = buildEventalign(options, reads, outPrefix)
 	embedEventalign(options, fasta, eventalign, reads, outPrefix, modified)
-	if options.random:
+	if "random" in options.selectMode:
 		# overwrite small training sets with random selection
 		callSubProcess(("./nanomod/scripts/select_data_fraction.sh {0} "
 				"{1}.train.txt {1}.val.txt").format(options.dataFraction,
@@ -197,15 +198,18 @@ def run(argv):
 	options = parseArgs(argv)
 	initialiseArgs(options)
 	try:
-		canonicalPrefix = "{}.canonical".format(options.outPrefix)
-		modifiedPrefix = "{}.modified".format(options.outPrefix)
-		# TODO: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
-		buildTrainingSet(options, options.canonicalReads, canonicalPrefix)
-		buildTrainingSet(options, options.modifiedReads, modifiedPrefix, 
-				modified=True)
-		combineTrainingSets(options, canonicalPrefix, modifiedPrefix, 
-				options.outPrefix)
-		#trainNanonet(options)
+		if options.modifiedReads is not None:
+			canonicalPrefix = "{}.canonical".format(options.outPrefix)
+			modifiedPrefix = "{}.modified".format(options.outPrefix)
+			# TODO: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
+			buildTrainingSet(options, options.canonicalReads, canonicalPrefix)
+			buildTrainingSet(options, options.modifiedReads, modifiedPrefix, 
+					modified=True)
+			combineTrainingSets(options, canonicalPrefix, modifiedPrefix, 
+					options.outPrefix)
+			#trainNanonet(options)
+		else:
+			buildTrainingSet(options, options.canonicalReads, options.outPrefix)
 	finally:
 		# we'd better clean up after ourselves, even if it crashes
 		clean(options)
