@@ -15,7 +15,7 @@
 
 #!/usr/bin/env python
 
-# python -m nanomod -r data/Nott_R9_run2/downloads/pass/ -g data/ecoli_k12.fasta -o data/Nott_R9_run2 -v --temp-dir temp; python -m nanomod -r data/2016_09_11_E_COLI_MTHYLTD_R9/reads/downloads/pass/ -g data/ecoli_k12.fasta -o data/2016_09_11_E_COLI_MTHYLTD_R9 -v --temp-dir temp --methyl --force --data-fraction 0.1; python -m nanomod -r data/2016_09_18_E_COLI_NON_MTHYLTD_R9/reads/downloads/pass/ -g data/ecoli_k12.fasta -o data/2016_09_18_E_COLI_NON_MTHYLTD_R9 -v --temp-dir temp --force --data-fraction 0.1 
+# python -m nanomod -c data/Nott_R9_run2/downloads/pass/ -g data/ecoli_k12.fasta -o data/Nott_R9_run2/nanomod --select-mode skip step stay --data-fraction 0.1 -v --temp-dir temp --force
 
 import argparse
 import subprocess
@@ -98,27 +98,37 @@ def clean(options):
 				os.remove(os.path.join(cwd, model))
 		os.remove(newModels)
 
-# parse command line args
-#
-# @args argv sys.argv
-# @return options Namespace object from argparse
+# 
 def parseArgs(argv):
+	"""parse command line args
+	@args argv sys.argv
+	@return options Namespace object from argparse
+	"""
 	
 	#command line options
-	parser = argparse.ArgumentParser(prog="nanomod")
+	parser = argparse.ArgumentParser(prog="nanomod",
+			description=("Generates a neural network model to call DNA base "
+			"modifications, using Oxford Nanopore Technologies' Nanonettrain."
+			" Requires: poretools, bwa, samtools, nanopolish, nanonettrain"), 
+			epilog=("Example usage: nanomod --canonical-reads " 
+			"sample_data/r9/canonical --modified-reads sample_data/r9/modified "
+			"--genome sample_data/ecoli_k12_mg1655.fa --output-prefix data/test"
+			" --sequence-motif CG MG --threads 16 --verbose --data-fraction 0.5"
+			" --select-mode random"))
 	parser.add_argument("-c","--canonical-reads", dest="canonicalReads", 
 			required=True, 
-			help="Directory in which canonical-base fast5 reads are stored")
+			help=("Directory in which canonical-base fast5 reads are stored " 
+			"(required)"))
 	parser.add_argument("-m", "--modified-reads", dest="modifiedReads",
-			required=False, 
 			help="Directory in which modified-base fast5 reads are stored")
 	parser.add_argument("-g", "--genome", required=True, 
-			dest="genome", help="Reference genome in fasta format")
+			dest="genome", help="Reference genome in fasta format (required)")
 	parser.add_argument("-o", "--output-prefix", dest="outPrefix", 
 			required=True, help="Prefix for nanomod output files")
 	parser.add_argument("-s", "--sequence-motif", dest="sequenceMotif",
-			nargs=2, required=False, default=["CG","MG"], 
-			help="Motif of canonical and modified site (e.g., -s CG MG)")
+			nargs=2, default=["CG","MG"], 
+			help=("Motif of canonical and modified site (e.g., -s CG MG) "
+			"(required if modified reads are provided)"))
 	parser.add_argument("-k", "--kmer", type=int, default=5,
 			help="Length of kmer for network training")
 	parser.add_argument("-t", "--threads", type=int, default=cpu_count(), 
@@ -138,7 +148,7 @@ def parseArgs(argv):
 			help=("Nanopolish models for eventalign. " 
 			"Note: will be copied to current working directory"))
 	parser.add_argument("--nanonet-template", dest="nanonetTemplate",
-			default="models/default_template.npy", 
+			default="models/r9_template.npy", 
 			help="Nanonet model file for network initialisation")
 	parser.add_argument("--force", default=False, action="store_true", 
 			dest="force", help="Force recreation of extant files")
@@ -150,8 +160,9 @@ def parseArgs(argv):
 	parser.add_argument("--data-fraction", type=float, default=1,
 			dest="dataFraction", help="Fraction of data to be sent to nanonet")
 	parser.add_argument("--select-mode", default=__modes__, nargs="*",
-			help=("Method for choosing reads to send to nanonet; choose from "
-			"'random', {}").format(", ".join(__modes__)), dest="selectMode")
+			help=("Method for choosing reads to send to nanonet; choose any or" 
+			" all from random, {}").format(", ".join(__modes__)), 
+			dest="selectMode")
 	
 	#parse command line options
 	options = parser.parse_args()
