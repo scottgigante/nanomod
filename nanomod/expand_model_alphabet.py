@@ -15,11 +15,9 @@
 # You should have received a copy of the GNU General Public License            #
 # along with Nanomod.  If not, see <http://www.gnu.org/licenses/>.             #
 #                                                                              #
-# expandModelAlphabet.py: builds a currennt network json for an enlarged     #
+# expandModelAlphabet.py: builds a currennt network json for an enlarged       #
 # base alphabet from an existing network: assumes that modified bases start    #
 # with initialisation equal to the unmodified bases.                           #
-#                                                                              #
-# TODO: Make methylation / demethylation more general.                         #
 #                                                                              #
 # Author: Scott Gigante                                                        #
 # Contact: gigante.s@wehi.edu.au                                               #

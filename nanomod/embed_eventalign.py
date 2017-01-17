@@ -69,14 +69,18 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 	# remove move field - nanonet adds it
 	events = drop_fields(events, "move")
 	
-	# remove unlabelled events -  TODO: is this helpful?
+	# remove unlabelled events 
+	# long stretches of unlabelled events severely decrease accuracy
 	events = events[events["kmer"] != 'X'*kmer]
 	
-	# TODO: check if this read passes or fails
+	# TODO: if the read fails QC, should we just move on?
 	numEvents = events.shape[0]
 	skipProb = float(numSkips)/numEvents
 	stayProb = float(numStays)/numEvents
 	stepProb = 1-skipProb-stayProb
+	passQuality = (skipProb < options.constraints['maxSkips'] and 
+			stayProb < options.constraints['maxStays'] and 
+			stepProb > options.constraints['minSteps'])
 	
 	filename = fast5Path.split('/')[-1]
 	newPath = getOutfile(filename, options)
@@ -120,9 +124,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 		attrs = attrsGroup.attrs
 		attrs.create("genome", chromosome)
 		
-	return (skipProb < options.constraints['maxSkips'] and 
-			stayProb < options.constraints['maxStays'] and 
-			stepProb > options.constraints['minSteps'])
+	return passQuality
 
 # step through eventalign data corresponding to a fast5 file and label events
 #
@@ -187,8 +189,8 @@ def processRead(options, idx, fast5Path, genome, modified):
 		if last_ref_index == current_ref_index:
 			numStays += 1
 		elif abs(last_ref_index - current_ref_index) > 1:
-			# does skipping two bases at once count as 2 skips or one???
-			# TODO: count size of skip, take negative into account
+			# count the size of the skip 
+			# skipping two bases at once counts as two skips
 			numSkips += abs(last_ref_index - current_ref_index) - 1
 		last_ref_index = current_ref_index
 		last_seq_pos = seq_pos
@@ -303,6 +305,8 @@ def writeTempFiles(options, eventalign, refs):
 	return filenames, idx, premadeFilenames
 
 # check quality of premade fast5 files
+# @args options Namespace object from argparse
+# @args filename Name of premade fast5 file
 def checkPremade(options, filename):
 	with h5py.File(getOutfile(filename, options), 'r') as fh:
 		attrs = fh.get(("Analyses/Basecall_1D_000/Summary/basecall_1d"
@@ -359,9 +363,9 @@ def checkPremadeWrapper(args):
 # @return None
 def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
 	output = "{}.train.txt.small".format(outPrefix)
-	#if callSubProcess("touch {}".format(output),
-	#		options, newFile=output) == 1:
-	#	return 1
+	if callSubProcess("touch {}".format(output),
+			options, newFile=output) == 1:
+		return 1
 	makeDir(options.outPrefix)
 	
 	log("Loading fast5 names and references...", 1, options)

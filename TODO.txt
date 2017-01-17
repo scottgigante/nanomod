@@ -1,18 +1,13 @@
-nanomod/seq_tools.py: include wildcard expansion 
-nanomod/seq_tools.py: can we turn this into a more generalised method? how?
-nanomod/seq_tools.py: maybe we should methylated the reference genome instead?
-nanomod/__main__.py: make this ranked? eg force 1, force 8?
-nanomod/__main__.py: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
-nanomod/expand_model_alphabet.py: Make methylation / demethylation more general. 
-nanomod/scripts/create_serial_net.py: use argparse 
-nanomod/scripts/build_eventalign_from_simulation.py: add options for 1D, 1D template only, 2D 
-nanomod/scripts/select_data_fraction.sh: Allow one or both input files to be empty. 
-nanomod/scripts/select_data_fraction.sh: Allow a random seed / just take head instead of shuf 
-nanomod/embed_eventalign.py: deal with secondary / auxiliary reads better 
-nanomod/embed_eventalign.py: remove unlabelled events - is this helpful?
-nanomod/embed_eventalign.py: check if this read passes or fails
-nanomod/embed_eventalign.py: can we determine kmer length earlier?
-nanomod/embed_eventalign.py: count size of skip, take negative into account
-nanomod/utils.py: can we move away from shell calls?
-nanomod/check_skip_stay_prob.py: add method to check bounds given desired proportion 
-nanomod/build_eventalign.py: why can't this handle more than eight cores? Arbitrary.
+nanomod/seq_tools.py:20: include wildcard expansion 
+nanomod/__main__.py:155: make this ranked? eg force 1, force 8?
+nanomod/__main__.py:215: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
+nanomod/scripts/create_serial_net.py:22: use argparse 
+nanomod/scripts/build_eventalign_from_simulation.py:21: add options for 1D, 1D template only, 2D 
+nanomod/scripts/select_data_fraction.sh:29: Allow one or both input files to be empty. 
+nanomod/scripts/select_data_fraction.sh:30: Allow a random seed / just take head instead of shuf 
+nanomod/embed_eventalign.py:21: deal with secondary / auxiliary reads better 
+nanomod/embed_eventalign.py:76: if the read fails QC, should we just move on?
+nanomod/embed_eventalign.py:131: can we determine kmer length earlier?
+nanomod/utils.py:55: can we move away from shell calls?
+nanomod/check_skip_stay_prob.py:20: add method to check bounds given desired proportion 
+nanomod/build_eventalign.py:59: why can't this handle more than eight cores? Arbitrary.

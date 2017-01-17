@@ -99,16 +99,11 @@ def getKmer(genome, chromosome, pos, kmer, forward):
 		stop_pos = -pos
 	return str(seq[start_pos:stop_pos])
 
-# apply CpG methylation to a sequence
+# apply base modification to a sequence
 #
-# TODO: can we turn this into a more generalised method? how?
-# TODO: maybe we should methylated the reference genome instead?
-#
-# @args seq The sequence to be methylated
-# @return The methylated sequence
-def modifySeq(options, seq):
-	# simply replacing CG with MG leaves out sequences ending in C that could be methylated
-	# as a result, we can't use the last base of the sequence effectively	
+# @args seq The sequence to be modified
+# @return The modified sequence
+def modifySeq(options, seq):	
 	return seq.replace(options.sequenceMotif[0],options.sequenceMotif[1])
 
 # replace a pattern only if at the start of a string
@@ -120,12 +115,11 @@ def lreplace(pattern, sub, string):
 def rreplace(pattern, sub, string):
     return string[:-len(pattern)] + sub if string.endswith(pattern) else string
 
-# undo CpG methylation to a sequence
+# undo base modification to a sequence
 # assume positive site recognition at either end if possible
-# allows wildcards UY
 #
-# @args seq The sequence to be demethylated
-# @return The demethylated sequence
+# @args seq The sequence to be unmodified
+# @return The unmodified sequence
 def unmodifySeq(seq, sequenceMotif):
 	# we have to check partial matches at either end
 	pattern = sequenceMotif[1]
