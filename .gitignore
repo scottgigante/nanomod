@@ -1,6 +1,7 @@
 temp
 data
 install.sh
+build_todo.sh
 nanomod/*.pyc
 .*
 nanomod/scripts/.*
