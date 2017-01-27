@@ -29,10 +29,8 @@ import json
 from nanonet.util import all_kmers
 import copy
 
-from seq_tools import unmodifySeq
+from seq_tools import unmodifySeq, __canonical__
 from utils import loadJson, saveJson, callSubProcess
-
-__alpha__ = ['A','G','C','T']
 
 def expandAlphabet(alpha, sequenceMotif):
 	expanded = list(alpha)
@@ -98,8 +96,8 @@ def expandModelAlphabet(options):
 			options, newFile=options.expandedTemplate) == 1:
 		return 1
 	inNetwork = loadJson(options.currenntTemplate)
-	alphabet = expandAlphabet(__alpha__, options.sequenceMotif)
-	kmers, reverseMap = generateKmers(__alpha__, alphabet, options.kmer, 
+	alphabet = expandAlphabet(__canonical__, options.sequenceMotif)
+	kmers, reverseMap = generateKmers(__canonical__, alphabet, options.kmer, 
 			options.sequenceMotif)
 	outNetwork = createExpandedNetwork(inNetwork, kmers, reverseMap)
 	saveJson(options.expandedTemplate, outNetwork)

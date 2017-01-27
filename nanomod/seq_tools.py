@@ -27,7 +27,9 @@
 
 from Bio import SeqIO, Seq
 import os
+from copy import copy
 
+__canonical__ = ['A','G','C','T']
 wildcards = { 'W' : ['A', 'T'],
 			  'S' : ['C','G'],
 			  'M' : ['A','C'],
@@ -45,7 +47,20 @@ wildcards = { 'W' : ['A', 'T'],
 def explodeMotifs(sequenceMotifs):
 	# NOT YET IMPLEMENTED
 	exit(1)
-	
+
+def unmodifyFasta(inFile, outFile, sequenceMotif):
+	"""Load a fasta file and clean it of base modifications, returning the 
+	original fasta as an array of records."""
+	fasta = []
+	with open(inFile, "rU") as inHandle, open(outFile, "w") as outHandle:
+		for record in SeqIO.parse(inHandle, "fasta"):
+			fasta.append(record)
+			unmodifiedRecord = copy(record)
+			unmodifiedRecord.seq = unmodifySeq(unmodifiedRecord.seq, 
+					sequenceMotif)
+			SeqIO.write(unmodifiedRecord, outHandle, "fasta")
+	return fasta
+
 # create a dictionary linking read names to fast5 file paths
 #
 # @args fasta Filename of the fasta file created by poretools
@@ -73,8 +88,8 @@ def loadGenome(options, modified=False):
 			reverseSeq = Seq.reverse_complement(record.seq) 
 			Seq.reverse_complement(reverseSeq)
 			if modified:
-				record.seq = Seq.Seq(modifySeq(options, str(record.seq)))
-				reverseSeq = Seq.Seq(modifySeq(options, str(reverseSeq)))
+				record.seq = modifySeq(options, record.seq)
+				reverseSeq = modifySeq(options, reverseSeq)
 			contig['seq'] = record.seq
 			contig['reverseSeq'] = reverseSeq
 			contig['record'] = record
@@ -103,8 +118,16 @@ def getKmer(genome, chromosome, pos, kmer, forward):
 #
 # @args seq The sequence to be modified
 # @return The modified sequence
-def modifySeq(options, seq):	
-	return seq.replace(options.sequenceMotif[0],options.sequenceMotif[1])
+def modifySeq(options, seq):
+	# TODO: we do this twice - make it a method?	
+	if type(seq) == Seq.Seq:
+		returnBioSeq = True
+		seq = str(seq)
+	else:
+		returnBioSeq = False
+		
+	seq = seq.replace(options.sequenceMotif[0],options.sequenceMotif[1])
+	return Seq.Seq(seq) if returnBioSeq else seq
 
 # replace a pattern only if at the start of a string
 # http://code.activestate.com/recipes/577252-lreplace-and-rreplace-replace-the-beginning-and-en/
@@ -121,10 +144,22 @@ def rreplace(pattern, sub, string):
 # @args seq The sequence to be unmodified
 # @return The unmodified sequence
 def unmodifySeq(seq, sequenceMotif):
+	if type(seq) == Seq.Seq:
+		returnBioSeq = True
+		seq = str(seq)
+	else:
+		returnBioSeq = False
+	
 	# we have to check partial matches at either end
 	pattern = sequenceMotif[1]
 	sub = sequenceMotif[0]
 	for i in range(1, len(pattern)):
 		seq = lreplace(pattern[i:], sub[i:], seq)
 		seq = rreplace(pattern[:i], sub[:i], seq)
-	return seq.replace(pattern,sub)
+	# now replace in the middle
+	seq = seq.replace(pattern,sub)
+	return Seq.Seq(seq) if returnBioSeq else seq
+	
+def getSeqDiff(s1, s2):
+	"""Get all positions where two sequences differ"""
+	return [i for i in xrange(len(s1)) if s1[i] != s2[i]]

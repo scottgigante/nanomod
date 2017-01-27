@@ -49,6 +49,20 @@ def log(message, level, options):
 		output = sys.stdout
 	print(__log_levels__[level] + message, file=output)
 
+def preventOverwrite(file, options):
+	""" Check if we are accidentally overwriting something
+	@param file Path to file to be written
+	@param options Namespace from argparse """
+	if file is not None and os.path.isfile(file):
+		if options.force:
+			log("{} already exists. Forcing recreation.".format(file), 
+					1, options)
+		else:
+			log("{} already exists. Use --force to recompute.".format(file), 
+					0, options)
+			return True
+	return False
+
 # call subprocess to create a new file using an external script if the file 
 # doesn't already exist
 #
@@ -68,15 +82,9 @@ def callSubProcess(call, options, newFile=None, outputFile=None, close_fds=True,
 		# print call to debug
 		log(call, 1, options)
 	
-		# check if we are accidentally overwriting something
-		if newFile is not None and os.path.isfile(newFile):
-			if options.force:
-				log("{} already exists. Forcing recreation.".format(newFile), 
-						1, options)
-			else:
-				log("{} already exists. Use --force to recompute.".format(newFile), 
-						0, options)
-				return 1
+		if preventOverwrite(newFile, options):
+			return 1
+		
 		if outputFile is not None:
 			out=open(outputFile, mode)
 		elif options.verbosity < 2:
@@ -89,7 +97,8 @@ def callSubProcess(call, options, newFile=None, outputFile=None, close_fds=True,
 		# check the file was created, if given
 		assert(newFile is None or os.path.isfile(newFile))
 	except OSError as e:
-		log("OSError: has a dependency changed path? Try deleting nanomod/.config.json and try again.", 0, options)
+		log("OSError: has a dependency changed path? Try deleting nanomod/.*.config.json and try again.", 0, options)
+		# TODO: fix this automatically - maybe a --check-dependencies option?
 		raise e
 	return 0
 

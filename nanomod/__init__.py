@@ -25,13 +25,24 @@ import subprocess
 import os
 import json
 
-__version__ = '0.0.1'
+__version__ = '0.1.0'
 __version_info__ = tuple([int(num) for num in __version__.split('.')])
 
 __exe__ = {}
 # list of executables required by this package
-__prognames__ = ['poretools', 'bwa', 'samtools', 'nanopolish', 'nanonettrain']#, 'currennt']
-__config__ = ".config.json"
+__prognames__ = { 'train' : [
+					'poretools', 
+					'bwa', 
+					'samtools', 
+					'nanopolish', 
+					'nanonettrain'
+					],#, 'currennt']
+				  'call' : [
+				  	'bwa',
+				  	'samtools',
+				  	'nanonetcall'
+				  	] }
+__config__ = "config.json"
 __modes__ = ["skip", "stay", "step"]
 
 # define path to an executable in global dictionary
@@ -58,22 +69,23 @@ def checkExecutable(progname):
         		" set via the environment variable '{1}'.").format(progname, 
         		progname.upper()))
 
-def loadConfig():
-	with open(__config__, 'r') as fh:
+def loadConfig(configName):
+	with open(configName, 'r') as fh:
 		config = json.load(fh)
 		for key in config['exe']:
 			__exe__[key] = config['exe'][key]
 
-def saveConfig(**config):
-	with open(__config__, 'w') as fh:
+def saveConfig(configName, **config):
+	with open(configName, 'w') as fh:
 		json.dump(config, fp=fh, indent=4)
 
-def init():
-	if os.path.isfile(__config__):
-		loadConfig()
+def init(command):
+	configName = ".".join(["",command,__config__])
+	if os.path.isfile(configName):
+		loadConfig(configName)
 	else:
 		# initialise and check all executables
-		for p in __prognames__:
+		for p in __prognames__[command]:
 			initExecutable(p)
 			checkExecutable(p)
-		saveConfig(exe=__exe__)
+		saveConfig(configName, exe=__exe__)

@@ -13,7 +13,9 @@
 # You should have received a copy of the GNU General Public License            #
 # along with Nanomod.  If not, see <http://www.gnu.org/licenses/>.             #
 #                                                                              #
-# __main__.py: Runs Scott Gigante's Nanomod.                                   #
+# index_modifications.py: Index where modified bases are in each read          #
+# Input: fast5 reads and nanomod trained network                               #
+# Output: fasta, bam, and file indexing probability of methylation per-base.   #
 #                                                                              #
 # Author: Scott Gigante                                                        #
 # Contact: gigante.s@wehi.edu.au                                               #
@@ -23,53 +25,43 @@
 
 #!/usr/bin/env python
 
-import argparse
-import sys
+import os
+import json
+from multiprocessing import Pool
 
-from train_nanomod import trainNanomod
-from call_nanomod import callNanomod
-from . import init
+from seq_tools import unmodifyFasta, __canonical__
+from utils import makeDir, multiprocessWrapper, preventOverwrite
 
-def parseArgs(argv):
-	"""parse command line args
-	@args argv sys.argv
-	@return options Namespace object from argparse
-	"""
+def indexRead(record, outputDir, options):
+	outputFile = os.path.join(outputDir, record.id)
+	if preventOverwrite(outputFile, options):
+		return
+	modIndex = dict()
+	for i in range(len(record.seq)):
+		if record.seq[i] not in __canonical__: 
+			try:
+				modIndex[record.seq[i]].append(i)
+			except KeyError:
+				# not yet initialised
+				modIndex[record.seq[i]] = [i]
+	with open(outputFile, 'wb') as handle:
+		json.dump(modIndex, fp=handle)
+
+def indexReadWrapper(args):
+	return multiprocessWrapper(indexRead, args)
+
+def indexAndCleanModifications(fastaFile, options):
+	outputDir = "{}.modIndex".format(options.outPrefix)
+	makeDir(outputDir)
 	
-	#command line options
-	parser = argparse.ArgumentParser(prog="nanomod",
-			description=("Nanopore base modification caller."), 
-			epilog=("Commands:\n"
-			"train\tTrain a neural network for a new type of modification\n"
-			"call\tUse an existing trained network to call modifications on a"
-			" set of fast5 files\n\n"
-			"Example usage: nanomod call -r sample_data/r9/modified -m "
-			"models/5mc.nanomod -o data/test.fa"),
-			formatter_class=argparse.RawTextHelpFormatter)
-	parser.add_argument("command", choices=("train","call"))
-	parser.add_argument("options", nargs=argparse.REMAINDER)
+	# TODO: should we avoid overwrite here? would have to reload fasta
+	unmodifiedFastaFile = "{}.unmodified.fasta".format(options.outPrefix)
+	fasta = unmodifyFasta(fastaFile, unmodifiedFastaFile, options.sequenceMotif)
 	
-	#parse command line options
-	options = parser.parse_args()
+	p = Pool(options.threads)
+	p.map(indexReadWrapper, [[i, outputDir, options] for i in fasta])
 	
-	return options
+	return unmodifiedFastaFile, outputDir
+	
 
-# run main script
-# 
-# @args argv sys.argv
-# @return None
-def run(argv):
-	options = parseArgs(argv)
-	# check executables
-	init(options.command)
-	if options.command == "train":
-		trainNanomod(options.options)
-	elif options.command == "call":
-		callNanomod(options.options)
-	else:
-		# panic
-		raise argparse.ArgumentError(command, "Command {} not found".format(options.command))
-		
-
-if __name__ == "__main__":
-	run(sys.argv)
+	
