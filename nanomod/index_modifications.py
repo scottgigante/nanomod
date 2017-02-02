@@ -30,7 +30,7 @@ import json
 from multiprocessing import Pool
 
 from seq_tools import unmodifyFasta, __canonical__
-from utils import makeDir, multiprocessWrapper, preventOverwrite
+from utils import makeDir, multiprocessWrapper, preventOverwrite, log
 
 def indexRead(record, outputDir, options):
 	outputFile = os.path.join(outputDir, record.id)
@@ -54,10 +54,12 @@ def indexAndCleanModifications(fastaFile, options):
 	outputDir = "{}.modIndex".format(options.outPrefix)
 	makeDir(outputDir)
 	
+	log("Cleaning fasta of modifications...", 1, options)
 	# TODO: should we avoid overwrite here? would have to reload fasta
 	unmodifiedFastaFile = "{}.unmodified.fasta".format(options.outPrefix)
 	fasta = unmodifyFasta(fastaFile, unmodifiedFastaFile, options.sequenceMotif)
 	
+	log("Indexing modifications on reads...", 1, options)
 	p = Pool(options.threads)
 	p.map(indexReadWrapper, [[i, outputDir, options] for i in fasta])
 	

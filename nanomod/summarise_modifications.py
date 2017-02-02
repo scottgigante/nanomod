@@ -32,8 +32,12 @@ import os
 import json
 import numpy as np
 
-from utils import callSubProcess, multiprocessWrapper
+from utils import callSubProcess, multiprocessWrapper, log
 from seq_tools import loadGenome, getSeqDiff
+
+def getBayesPercentage(numMods, numUnmods, numReads, alpha):
+	# TODO: can we use coverage vs. numMods + numUnmods to get a clever value for alpha?
+	return float(numMods + alpha)/(numMods + numUnmods + alpha)
 
 def checkModifiedPositions(options):
 	modPositions = dict()
@@ -46,7 +50,7 @@ def checkModifiedPositions(options):
 				modGenome[contig]['seq'])
 		modPositions[contig]['-'] = getSeqDiff(
 				canonGenome[contig]['reverseSeq'], 
-				modGenome[contig]['reverseSeq'])
+				modGenome[contig]['reverseSeq'])	
 	return modPositions, canonGenome
 
 def checkReadModification(queryName, readPos, readLength, cigarTuples, reverse, 
@@ -66,7 +70,8 @@ def checkReadModification(queryName, readPos, readLength, cigarTuples, reverse,
 			return base
 	return False
 
-def processBase(pileupColumn, modPositions, genome, modDir):
+def processBase(pileupColumn, alpha, modPositions, genome, contig, modDir, 
+		dtype):
 	refPos = pileupColumn.reference_pos
 	
 	# check if there are any modifiable bases in this position on reference
@@ -76,14 +81,16 @@ def processBase(pileupColumn, modPositions, genome, modDir):
 	if refPos in modPositions[refName]['+']:
 		checkFwd = True
 	if (-refPos-1+len(genome)) in modPositions[refName]['-']:
+		# TODO: we have 345000 sites when we should have double that - is reverse working?
 		checkReverse = True
-	if not checkFwd or checkReverse:
+	if not (checkFwd or checkReverse):
 		# ref genome is not modified here
 		return
 	
 	# count modifications
 	numMods = 0
-	numReads = 0
+	numUnmods = 0
+	numNoMatch = 0
 	for read in pileupColumn.pileups:
 		# check direction
 		reverse = read.alignment.is_reverse
@@ -96,29 +103,36 @@ def processBase(pileupColumn, modPositions, genome, modDir):
 		readPos = read.query_position
 		if readPos is None:
 			# deletion
+			numNoMatch += 1
 			continue
 		if not (read.alignment.query_sequence[readPos] == genome[refPos]):
 			# mismatch
+			numNoMatch += 1
 			continue
 		
 		if checkReadModification(read.alignment.query_name, readPos, 
 				read.alignment.query_length, read.alignment.cigartuples, 
 				reverse, modDir) is not False:
 			numMods += 1
-		numReads += 1
-	return [refPos, numMods, numReads] # TODO: are these returned in order? If so, remove reference pos
+		else:
+			numUnmods += 1
+	numReads = numMods + numUnmods + numNoMatch
+	modProb = getBayesPercentage(numMods, numUnmods, numReads, alpha)
+	return np.array([(contig, refPos, modProb, numMods, numUnmods, 
+			numReads)], dtype=dtype)
 
-def processWindow(bamFile, contig, startPos, endPos, modPositions, genome, 
-		modDir):
+def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions, 
+		genome, modDir, dtype):
 	bam = pysam.AlignmentFile(bamFile, "rb")
-	output = np.ndarray(shape=(0,3))
+	output = np.empty(shape=(0,), dtype=dtype)
 	for base in bam.pileup(contig, startPos, endPos):
 		refPos = base.reference_pos
 		if refPos >= startPos and refPos < endPos:
 			# window is expanded for some reason
-			baseOutput = processBase(base, modPositions, genome, modDir)
+			baseOutput = processBase(base, alpha, modPositions, genome, contig, 
+					modDir, dtype)
 			if baseOutput is not None:
-				output = np.append(output, [baseOutput], axis=0)
+				output = np.append(output, baseOutput)
 	bam.close()
 	return output
 	
@@ -127,27 +141,73 @@ def processWindowWrapper(args):
 
 def countModifications(bamFile, modDir, options):
 	# TODO: allow specifying a window to reduce time cost
+	log("Indexing modification sites on reference genome...", 1, options)
 	modPositions, genome = checkModifiedPositions(options)
-	modCounts = dict()
 	
+	# S32 string, <u4 uint32, <f4 float32, u1 uint8 <u2 uint16
+	dtype = np.dtype("S32,<u4,<f4,u1,u1,u1")
+	aggDtype = np.dtype("S32,<u4,<u4,<f4,<u2,<u2,<u2")
+	if options.window is None or options.window < 2:
+		fmt = "\t".join(["%s","%i","%lf","%i","%i","%i"])
+		header = "\t".join(["Chromosome", "Position", "Modified Percentage", 
+				"Count Modified", "Count Unmodified", "Coverage"])
+		modCounts = np.empty(shape=(0,), dtype=dtype)
+	else:
+		fmt = "\t".join(["%s","%i","%i","%lf","%i","%i","%i"])
+		header = "\t".join(["Chromosome", "Start", "Stop",
+				"Modified Percentage", "Count Modified", "Count Unmodified", 
+				"Coverage"])
+		modCounts = np.empty(shape=(0,), dtype=aggDtype)
+	
+	log("Analyzing read modifications...", 1, options)
 	basesPerCall = 2000 
 	# pileup seems to take a minimum of 2000 even if you specify less
 	for contig in genome:
-		refLength = len(genome[contig]['seq'])
-		windowArray = [i for i in xrange(1, refLength, basesPerCall)]
+		contigModCounts = np.empty(shape=(0,), dtype=dtype)
+		refStart = 1
+		refEnd = len(genome[contig]['seq'])
+		if options.region is not None:
+			if contig != options.region[0]:
+				continue
+			else:
+				refStart = max(refStart, options.region[1])
+				if options.region[2] is not None:
+					refEnd = min(refEnd, options.region[2])
+		
+		windowArray = [i for i in xrange(refStart, refEnd, basesPerCall)]
 		p = Pool(options.threads)
-		argsList = [[bamFile, contig, i, i+basesPerCall, modPositions, 
-				genome[contig]['seq'], modDir] for i in windowArray]
-		# TODO: need to run pileup within single thread. Should be okay to read from multiple locations.
+		argsList = [[bamFile, contig, i, min(i+basesPerCall, refEnd), 
+				options.alpha, modPositions, genome[contig]['seq'], 
+				modDir, dtype] for i in windowArray]
 		windows = p.map(processWindowWrapper, argsList)
-		if len(windows) > 1:
-			modCounts[contig] = np.array(windows[0])
-			for i in range(1,len(windows)):
-				modCounts[contig] = np.append(modCounts[contig], windows[i],
-						axis=0)
-			modCounts[contig] = modCounts[contig].tolist() # TODO: should we avoid using numpy? Keep numpy and remove JSON (probably.)
-	
-	return modCounts
-	
-
-	
+		for w in windows:
+			contigModCounts = np.append(contigModCounts, w)
+		
+		if options.window is None or options.window < 2:
+			modCounts = np.append(modCounts, contigModCounts)
+		else:
+			# aggregate calls
+			backStep = (options.window - 1) / 2
+			forwardStep = (options.window - 1) / 2 + (options.window - 1) % 2
+			for i in range(contigModCounts.shape[0]):
+				startPos = contigModCounts['f1'][i] - backStep
+				endPos = contigModCounts['f1'][i] + forwardStep + 1
+				# coarse window
+				countsWindow = contigModCounts[range(max(0,i-backStep), 
+						min(contigModCounts.shape[0],i+forwardStep+1))]
+				afterStart = countsWindow['f1'] >= startPos
+				beforeEnd = countsWindow['f1'] < endPos
+				# fine window
+				countsWindow = countsWindow[np.logical_and(afterStart, 
+						beforeEnd)]
+				numMods = sum(countsWindow['f3'])
+				numUnmods = sum(countsWindow['f4'])
+				numReads = sum(countsWindow['f5'])
+				modProb = getBayesPercentage(numMods, numUnmods, numReads, 
+							options.alpha)
+				modCounts = np.append(modCounts, np.array([(contig, 
+						startPos, endPos, modProb, numMods, numUnmods, 
+						numReads)], dtype=aggDtype))
+					
+	return fmt, header, modCounts
+		

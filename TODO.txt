@@ -1,6 +1,15 @@
 nanomod/seq_tools.py:20: include wildcard expansion 
-nanomod/__main__.py:155: make this ranked? eg force 1, force 8?
-nanomod/__main__.py:215: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
+nanomod/seq_tools.py:122: we do this twice - make it a method? 
+nanomod/index_modifications.py:58: should we avoid overwrite here? would have to reload fasta
+nanomod/call_nanomod.py:86: "(required)")) include in model?
+nanomod/call_nanomod.py:97: parser.add_argument("--chemistry", default="r9") can we infer this?
+nanomod/call_nanomod.py:126: we do this twice - separate into a new file?
+nanomod/call_nanomod.py:140: specify dtype
+nanomod/summarise_modifications.py:39: can we use coverage vs. numMods + numUnmods to get a clever value for alpha?
+nanomod/summarise_modifications.py:58: check that this checks the correct position
+nanomod/summarise_modifications.py:84: we have 345000 sites when we should have double that - is reverse working?
+nanomod/summarise_modifications.py:143: allow specifying a window to reduce time cost
+nanomod/nanonetcall.py:493: handle case where there are pre-existing files.
 nanomod/scripts/create_serial_net.py:22: use argparse 
 nanomod/scripts/build_eventalign_from_simulation.py:21: add options for 1D, 1D template only, 2D 
 nanomod/scripts/select_data_fraction.sh:29: Allow one or both input files to be empty. 
@@ -8,6 +17,9 @@ nanomod/scripts/select_data_fraction.sh:30: Allow a random seed / just take head
 nanomod/embed_eventalign.py:21: deal with secondary / auxiliary reads better 
 nanomod/embed_eventalign.py:76: if the read fails QC, should we just move on?
 nanomod/embed_eventalign.py:131: can we determine kmer length earlier?
-nanomod/utils.py:55: can we move away from shell calls?
+nanomod/utils.py:69: can we move away from shell calls?
+nanomod/utils.py:101: fix this automatically - maybe a --check-dependencies option?
+nanomod/train_nanomod.py:164: make this ranked? eg force 1, force 8?
+nanomod/train_nanomod.py:224: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
 nanomod/check_skip_stay_prob.py:20: add method to check bounds given desired proportion 
 nanomod/build_eventalign.py:59: why can't this handle more than eight cores? Arbitrary.

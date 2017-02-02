@@ -26,8 +26,9 @@
 #!/usr/bin/env python
 
 import argparse
-import json
+import numpy as np
 from multiprocessing import cpu_count
+import re
 
 from utils import callSubProcess
 from index_modifications import indexAndCleanModifications
@@ -35,6 +36,26 @@ from summarise_modifications import countModifications
 from seq_tools import loadGenome
 from . import __exe__
 
+def parseRegion(region):
+	region = ''.join(region.split()) # remove whitespace
+	region = re.split(':|-', region)
+	start = 0
+	end = None
+	if len(region) < 1:
+		raise argparse.ArgumentTypeError("Region must specify a reference name")
+	elif len(region) > 3:
+		raise argparse.ArgumentTypeError("Region format not recognized")
+	else:
+		contig = region[0]
+		try:
+			start = int(re.sub(",|\.", "", region[1]))
+			end = int(re.sub(",|\.", "", region[2]))
+		except IndexError:
+			# no worries, we don't have to specify a window
+			pass
+		finally:
+			return contig, start, end
+			
 def parseArgs(argv):
 	"""parse command line args
 	@args argv sys.argv
@@ -60,7 +81,7 @@ def parseArgs(argv):
 			default="models/5mc.nanomod.npy", #required=True,
 			help="Nanomod pre-trained network (required)")
 	parser.add_argument("-s", "--sequence-motif", dest="sequenceMotif",
-			nargs=2, default=["CG","MG"], 
+			nargs=2, default=["CG","MG"], metavar="CANONICAL MODIFIED",
 			help=("Motif of canonical and modified site (e.g., -s CG MG) "
 			"(required)")) # TODO: include in model?
 	parser.add_argument("-t", "--threads", type=int, default=cpu_count(), 
@@ -69,9 +90,15 @@ def parseArgs(argv):
 	parser.add_argument("-v","--verbose", default=0, action="count", 
 			dest="verbosity", help=("Can be used multiple times (e.g., -vv) "
 			"for greater levels of verbosity."))
+	parser.add_argument("--region", type=parseRegion, metavar="CHR:START-END",
+			help="Name of contig to analyze")
+	parser.add_argument("--window", type=int, metavar="SIZE", 
+			help="Size of window over which to aggregate calls")
 	parser.add_argument("--chemistry", default="r9") # TODO: can we infer this?
 	parser.add_argument("--num-reads", type=int, default=-1, dest="numReads", 
 			help="Limit the number of reads to be analysed")
+	parser.add_argument("--alpha", default=0.5, type=float, 
+			help="Parameter for uninformative Beta prior")
 	parser.add_argument("--force", default=False, action="store_true", 
 			dest="force", help="Force recreation of extant files")
 	
@@ -89,9 +116,9 @@ def callNanomod(argv):
 	
 	fastaFile = "{}.fasta".format(options.outPrefix)
 	callSubProcess([__exe__['nanonetcall'], "--chemistry", options.chemistry, 
-			"--jobs", options.threads, "--model", options.model, "--output",
-			fastaFile, "--section", "template", options.reads], options, 
-			shell=False, newFile=fastaFile)
+			"--jobs", str(options.threads), "--model", options.model, 
+			"--output",	fastaFile, "--section", "template", options.reads], 
+			options, shell=False, newFile=fastaFile)
 	
 	unmodifiedFastaFile, modDir = indexAndCleanModifications(fastaFile, options)
 	
@@ -100,12 +127,14 @@ def callNanomod(argv):
 	callSubProcess(('{} mem -x ont2d -t {} {} {} | samtools view -Sb - '
 			'| samtools sort -f - {}').format(__exe__['bwa'], options.threads,
 			options.genome, unmodifiedFastaFile, sortedBamFile), options, 
-			outputFile=sortedBamFile, newFile=sortedBamFile)
+			outputFile=sortedBamFile, newFile=sortedBamFile)	
 	callSubProcess([__exe__['samtools'], 'index', sortedBamFile], options, 
 			shell=False)
 	
-	modificationCounts = countModifications(sortedBamFile, modDir, options)
+	fmt, header, modCounts = countModifications(sortedBamFile, modDir, options)
+	#wig = getWiggleTrack(modificationCounts)
 	
 	outFile = "{}.methylation.txt".format(options.outPrefix)
-	with open(outFile, 'w') as handle:
-		json.dump(modificationCounts, fp=handle, indent=4)
+	with open(outFile, 'wb') as handle:
+		np.savetxt(handle, modCounts, fmt=fmt, header=header)
+# TODO: specify dtype
