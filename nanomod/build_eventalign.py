@@ -31,7 +31,7 @@ from multiprocessing import Pool
 from functools import partial
 import subprocess
 
-from utils import callSubProcess, log, multiprocessWrapper
+from utils import callSubProcess, log, multiprocessWrapper, preventOverwrite
 from . import __exe__
 
 # custom use of subprocess for poretools to allow special return value for multiprocessing
@@ -64,7 +64,7 @@ def callPoretoolsWrapper(args):
 # @return None
 def multithreadPoretools(poretools, options, reads, output, filesPerCall=1000):
 	# check first that we actually want to edit
-	if callSubProcess("touch {}".format(output), options, newFile=output) == 1:
+	if preventOverwrite(output, options):
 		return 1
 		
 	cwd = os.getcwd()
@@ -99,12 +99,12 @@ def multithreadPoretools(poretools, options, reads, output, filesPerCall=1000):
 def buildEventalign(options, reads, outPrefix):
 	
 	fastaFile = '{}.fasta'.format(outPrefix)
-	multithreadPoretools(__exe__['poretools'], options, reads, fastaFile)
+	#multithreadPoretools(__exe__['poretools'], options, reads, fastaFile)
 	#poretoolsMaxFiles = 1000
-	#callSubProcess(('find {} -name "*.fast5" | parallel -j16 -l {} "{} ' 
-	#		'--type fwd fasta"').format(reads, poretoolsMaxFiles, 
-	#		__exe__['poretools']), options, newFile=fastaFile, 
-	#		outputFile=fastaFile)
+	callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X {} fasta ' 
+			'--type fwd {}').format(reads, 
+			__exe__['poretools'],"{}"), options, newFile=fastaFile, 
+			outputFile=fastaFile)
 	#callSubProcess(('{} fasta --type fwd {}').format(__exe__['poretools'], 
 	#		reads), options, newFile=fastaFile, outputFile=fastaFile)
 	

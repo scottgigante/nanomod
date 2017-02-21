@@ -80,7 +80,7 @@ def callSubProcess(call, options, newFile=None, outputFile=None, close_fds=True,
 	try:
 		# we should use shell=False to make this more portable
 		# print call to debug
-		log(call, 1, options)
+		log(call if shell else " ".join(call), 1, options)
 	
 		if preventOverwrite(newFile, options):
 			return 1
