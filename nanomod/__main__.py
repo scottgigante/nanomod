@@ -30,7 +30,7 @@ from train_nanomod import trainNanomod
 from call_nanomod import callNanomod
 from . import init
 
-def parseArgs(argv):
+def parseArgs():
 	"""parse command line args
 	@args argv sys.argv
 	@return options Namespace object from argparse
@@ -58,8 +58,8 @@ def parseArgs(argv):
 # 
 # @args argv sys.argv
 # @return None
-def run(argv):
-	options = parseArgs(argv)
+def run():
+	options = parseArgs()
 	# check executables
 	init(options.command)
 	if options.command == "train":
@@ -72,4 +72,4 @@ def run(argv):
 		
 
 if __name__ == "__main__":
-	run(sys.argv)
+	run()
