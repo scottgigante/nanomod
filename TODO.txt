@@ -8,10 +8,12 @@ nanomod/call_nanomod.py:140: specify dtype
 nanomod/summarise_modifications.py:39: can we use coverage vs. numMods + numUnmods to get a clever value for alpha?
 nanomod/summarise_modifications.py:58: check that this checks the correct position
 nanomod/summarise_modifications.py:84: we have 345000 sites when we should have double that - is reverse working?
-nanomod/summarise_modifications.py:143: allow specifying a window to reduce time cost
+nanomod/summarise_modifications.py:165: allow specifying a window to reduce time cost
 nanomod/nanonetcall.py:493: handle case where there are pre-existing files.
 nanomod/scripts/create_serial_net.py:22: use argparse 
 nanomod/scripts/build_eventalign_from_simulation.py:21: add options for 1D, 1D template only, 2D 
+nanomod/scripts/build_eventalign_from_simulation.py:196: include CGIs?
+nanomod/scripts/build_eventalign_from_simulation.py:294: what about reverse reads?
 nanomod/scripts/select_data_fraction.sh:29: Allow one or both input files to be empty. 
 nanomod/scripts/select_data_fraction.sh:30: Allow a random seed / just take head instead of shuf 
 nanomod/embed_eventalign.py:21: deal with secondary / auxiliary reads better 
