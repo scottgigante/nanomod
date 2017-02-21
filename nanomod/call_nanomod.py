@@ -29,11 +29,13 @@ import argparse
 import numpy as np
 from multiprocessing import cpu_count
 import re
+import h5py
 
 from utils import callSubProcess
 from index_modifications import indexAndCleanModifications
 from summarise_modifications import countModifications
 from seq_tools import loadGenome
+from shutil import copyfile
 from . import __exe__
 
 def parseRegion(region):
@@ -101,6 +103,9 @@ def parseArgs(argv):
 			help="Parameter for uninformative Beta prior")
 	parser.add_argument("--force", default=False, action="store_true", 
 			dest="force", help="Force recreation of extant files")
+	parser.add_argument("--no-normalize", default=False, action="store_true", 
+			dest="noNormalise", 
+			help="do not apply median normalization before run")
 	
 	#parse command line options
 	options = parser.parse_args(argv)
@@ -114,11 +119,36 @@ def parseArgs(argv):
 def callNanomod(argv):
 	options = parseArgs(argv)
 	
+	if not options.noNormalise:
+		# median normalise
+		# TODO: we do this twice - make this into a routine.
+		# TODO: oh no now we're modifying the raw data!
+		newReads = os.path.join(os.reads, "nanomod")
+		os.mkdir(newReads)
+		for f in os.listdir(options.reads):
+			if f.endswith(".fast5"):
+				path = os.path.join(options.reads, f)
+				newPath = os.path.join(options.reads, "nanomod", f)
+				copyfile(path, newPath)
+				with h5py.File(newPath, 'r+') as f:
+					raw_group = f["Raw/Reads"].values()[0]
+					signal = raw_group["Signal"][()]
+					med = np.median(signal)
+					median_deviation = np.array([signal[i] - med for i in range(len(signal))], dtype = "float32")
+					MAD = 1.0/len(signal) * sum(median_deviation)
+					signal = median_deviation / MAD
+					del raw_group["Signal"]
+					raw_group["Signal"] = signal
+		options.reads = newReads
+				
+	
 	fastaFile = "{}.fasta".format(options.outPrefix)
 	callSubProcess([__exe__['nanonetcall'], "--chemistry", options.chemistry, 
 			"--jobs", str(options.threads), "--model", options.model, 
-			"--output",	fastaFile, "--section", "template", options.reads], 
+			"--output",	fastaFile, "--limit", str(options.numReads), "--section", "template", options.reads], 
 			options, shell=False, newFile=fastaFile)
+	# TODO: don't inclide --limit if numReads is -1
+	# TODO: fix bases
 	
 	unmodifiedFastaFile, modDir = indexAndCleanModifications(fastaFile, options)
 	

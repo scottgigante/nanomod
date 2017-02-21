@@ -172,6 +172,11 @@ def parseArgs(argv):
 			help=("Method for choosing reads to send to nanonet; choose any or" 
 			" all from random, {}").format(", ".join(__modes__)), 
 			dest="selectMode")
+	parser.add_argument("--read-length", default=2000, type=int, 
+			dest="readLength", help="Minimum read length for training reads.")
+	parser.add_argument("--no-normalize", default=True, action="store_false", 
+			dest="noNormalize", 
+			help="do not apply median normalization before run")
 	
 	#parse command line options
 	options = parser.parse_args(argv)
