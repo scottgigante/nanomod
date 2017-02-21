@@ -139,6 +139,28 @@ def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions,
 def processWindowWrapper(args):
 	return multiprocessWrapper(processWindow, args)
 
+def aggregateWindowCounts(modCounts, pos, row, forwardStep, backStep, contig, 
+		aggDtype, options):
+	""" forwardStep 1-based end position
+	backStep 0-based start position """
+	# coarse window
+	countsWindow = modCounts[range(max(0, row-backStep), 
+			min(modCounts.shape[0], row+forwardStep))]
+	afterStart = countsWindow['f1'] >= pos - backStep
+	beforeEnd = countsWindow['f1'] < pos + forwardStep
+	# fine window
+	countsWindow = countsWindow[np.logical_and(afterStart, beforeEnd)]
+	startPos = min(countsWindow['f1'])
+	endPos = max(countsWindow['f1'])
+	numMods = sum(countsWindow['f3'])
+	numUnmods = sum(countsWindow['f4'])
+	numReads = sum(countsWindow['f5'])
+	print [startPos, endPos, numReads]
+	modProb = getBayesPercentage(numMods, numUnmods, numReads, 
+				options.alpha)
+	return np.array([(contig, startPos, endPos, modProb, numMods, numUnmods, 
+			numReads)], dtype=aggDtype)
+
 def countModifications(bamFile, modDir, options):
 	# TODO: allow specifying a window to reduce time cost
 	log("Indexing modification sites on reference genome...", 1, options)
@@ -188,26 +210,14 @@ def countModifications(bamFile, modDir, options):
 		else:
 			# aggregate calls
 			backStep = (options.window - 1) / 2
-			forwardStep = (options.window - 1) / 2 + (options.window - 1) % 2
+			forwardStep = (options.window-1) / 2 + (options.window - 1) % 2 + 1
 			for i in range(contigModCounts.shape[0]):
-				startPos = contigModCounts['f1'][i] - backStep
-				endPos = contigModCounts['f1'][i] + forwardStep + 1
-				# coarse window
-				countsWindow = contigModCounts[range(max(0,i-backStep), 
-						min(contigModCounts.shape[0],i+forwardStep+1))]
-				afterStart = countsWindow['f1'] >= startPos
-				beforeEnd = countsWindow['f1'] < endPos
-				# fine window
-				countsWindow = countsWindow[np.logical_and(afterStart, 
-						beforeEnd)]
-				numMods = sum(countsWindow['f3'])
-				numUnmods = sum(countsWindow['f4'])
-				numReads = sum(countsWindow['f5'])
-				modProb = getBayesPercentage(numMods, numUnmods, numReads, 
-							options.alpha)
-				modCounts = np.append(modCounts, np.array([(contig, 
-						startPos, endPos, modProb, numMods, numUnmods, 
-						numReads)], dtype=aggDtype))
+				pos = contigModCounts['f1'][i]
+				window = aggregateWindowCounts(contigModCounts, pos, i,
+						forwardStep, backStep, contig, aggDtype, options)
+				if modCounts.shape[0] == 0 or not window == modCounts[-1]:
+					# exclude duplicate rows
+					modCounts = np.append(modCounts, window)
 					
 	return fmt, header, modCounts
 		
