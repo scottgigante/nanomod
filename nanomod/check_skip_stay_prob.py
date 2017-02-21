@@ -45,7 +45,8 @@ def checkProbs(filename):
 		skipProb = attrs["num_skips"]/numEvents
 		stayProb = attrs["num_stays"]/numEvents
 		stepProb = 1-skipProb-stayProb
-	return [skipProb, stayProb, stepProb]
+		readLength = attrs["sequence_length"]
+	return [skipProb, stayProb, stepProb, readLength]
 
 # get the empirical skip and stay probabilities for a set of reads
 # @param dir The directory to search for fast5 files
@@ -54,7 +55,7 @@ def checkProbs(filename):
 # @return maxSkips
 # @return maxStays
 # @return minSteps
-def getSkipStayConstraints(dir, proportion, mode=__modes__):
+def getSkipStayConstraints(dir, proportion, mode=__modes__, readLength=2000):
 	for m in mode:
 		if m not in __modes__:
 			log("Mode {} not recognised", 0, options)
@@ -62,6 +63,7 @@ def getSkipStayConstraints(dir, proportion, mode=__modes__):
 	
 	p = Pool()
 	probs = np.array(p.map(checkProbs, files)).transpose()	
+	probs = probs.transpose()[probs[3] >= readLength].transpose()
 	
 	skipMean, skipStdv = getStats(probs[0])
 	stayMean, stayStdv = getStats(probs[1])
