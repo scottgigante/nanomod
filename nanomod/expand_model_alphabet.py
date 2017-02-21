@@ -28,9 +28,10 @@
 import json
 from nanonet.util import all_kmers
 import copy
+import sys
 
 from seq_tools import unmodifySeq, __canonical__
-from utils import loadJson, saveJson, callSubProcess
+from utils import loadJson, saveJson, callSubProcess, preventOverwrite
 
 def expandAlphabet(alpha, sequenceMotif):
 	expanded = list(alpha)
@@ -91,13 +92,25 @@ def createExpandedNetwork(inNetwork, kmers, reverseMap):
 	
 	return outNetwork
 
-def expandModelAlphabet(options):
-	if callSubProcess("touch {}".format(options.expandedTemplate),
-			options, newFile=options.expandedTemplate) == 1:
-		return 1
-	inNetwork = loadJson(options.currenntTemplate)
-	alphabet = expandAlphabet(__canonical__, options.sequenceMotif)
-	kmers, reverseMap = generateKmers(__canonical__, alphabet, options.kmer, 
-			options.sequenceMotif)
+def run(inFilename, outFilename, kmer, sequenceMotif, options=None):
+	try:
+		if preventOverwrite(outFilename, options):
+			return 1
+	except NameError:
+		# running as standalone, no such thing as options
+		pass
+	inNetwork = loadJson(inFilename)
+	alphabet = expandAlphabet(__canonical__, sequenceMotif)
+	kmers, reverseMap = generateKmers(__canonical__, alphabet, kmer, 
+			sequenceMotif)
 	outNetwork = createExpandedNetwork(inNetwork, kmers, reverseMap)
-	saveJson(options.expandedTemplate, outNetwork)
+	saveJson(outFilename, outNetwork)
+
+def expandModelAlphabet(options):
+	run(options.currenntTemplate, options.expandedTemplate, options.kmer, 
+			options.sequenceMotif, options)
+	
+if __name__ == "__main__":
+	args = sys.argv
+	run(args[1], args[2], int(args[3]), [args[4], args[5]])
+	
