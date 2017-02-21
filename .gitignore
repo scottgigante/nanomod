@@ -8,3 +8,6 @@ nanomod/scripts/.*
 nanomod/test/.*
 nanomod/.*
 models/*.json
+build
+dist
+nanomod.egg-info
