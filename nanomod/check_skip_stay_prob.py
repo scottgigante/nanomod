@@ -31,22 +31,26 @@ import os
 import numpy as np
 from multiprocessing import Pool
 import json
+import logging
 
 from . import __modes__
-from utils import log
 
 def getStats(ary):
-	return np.mean(ary), np.std(ary)
+    return np.mean(ary), np.std(ary)
 
 def checkProbs(filename):
-	with h5py.File(filename, 'r') as fh:
-		attrs = fh.get("Analyses/Basecall_1D_000/Summary/basecall_1d_template").attrs
-		numEvents = float(attrs["called_events"])
-		skipProb = attrs["num_skips"]/numEvents
-		stayProb = attrs["num_stays"]/numEvents
-		stepProb = 1-skipProb-stayProb
-		readLength = attrs["sequence_length"]
-	return [skipProb, stayProb, stepProb, readLength]
+    try:
+        with h5py.File(filename, 'r') as fh:
+            attrs = fh.get("Analyses/Basecall_1D_000/Summary/basecall_1d_template").attrs
+            numEvents = float(attrs["called_events"])
+            skipProb = attrs["num_skips"]/numEvents
+            stayProb = attrs["num_stays"]/numEvents
+            stepProb = 1-skipProb-stayProb
+            readLength = attrs["sequence_length"]
+    except IOError:
+        print "Failed to open {}".format(filename) # TODO: use logging here
+        skipProb, stayProb, stepProb, readLength = 1, 1, 0, 0
+    return [skipProb, stayProb, stepProb, readLength]
 
 # get the empirical skip and stay probabilities for a set of reads
 # @param dir The directory to search for fast5 files
@@ -56,40 +60,40 @@ def checkProbs(filename):
 # @return maxStays
 # @return minSteps
 def getSkipStayConstraints(dir, proportion, mode=__modes__, readLength=2000):
-	for m in mode:
-		if m not in __modes__:
-			log("Mode {} not recognised", 0, options)
-	files = [os.path.join(dir,file) for file in os.listdir(dir) if file.endswith(".fast5")]
-	
-	p = Pool()
-	probs = np.array(p.map(checkProbs, files)).transpose()	
-	probs = probs.transpose()[probs[3] >= readLength].transpose()
-	
-	skipMean, skipStdv = getStats(probs[0])
-	stayMean, stayStdv = getStats(probs[1])
-	stepMean, stepStdv = getStats(probs[2])
-	
-	cutoffs = []
-	for read in probs.transpose():
-		deviations = []
-		if "skip" in mode:
-			deviations.append((read[0] - skipMean)/skipStdv)
-		if "stay" in mode:
-			deviations.append((read[1] - stayMean)/stayStdv)
-		if "step" in mode:
-			deviations.append((stepMean - read[2])/stepStdv)
-		cutoffs.append(max(deviations))
-	cutoffs.sort()
-	numStdvs = cutoffs[int((len(cutoffs)-1)*proportion)] 
-	# want number between 0 and length - 1
-	
-	maxSkips = skipMean + numStdvs * skipStdv
-	maxStays = stayMean + numStdvs * stayStdv
-	minSteps = stepMean - numStdvs * stepStdv
-	
-	return {'maxSkips' : maxSkips if "skip" in mode else 1,
-			'maxStays' : maxStays if "stay" in mode else 1, 
-			'minSteps' : minSteps if "step" in mode else 0}
+    for m in mode:
+        if m not in __modes__:
+            logging.warning("Mode {} not recognised")
+    files = [os.path.join(dir,file) for file in os.listdir(dir) if file.endswith(".fast5")]
+    
+    p = Pool()
+    probs = np.array(p.map(checkProbs, files)).transpose()
+    probs = probs.transpose()[probs[3] >= readLength].transpose()
+    
+    skipMean, skipStdv = getStats(probs[0])
+    stayMean, stayStdv = getStats(probs[1])
+    stepMean, stepStdv = getStats(probs[2])
+    
+    cutoffs = []
+    for read in probs.transpose():
+        deviations = []
+        if "skip" in mode:
+            deviations.append((read[0] - skipMean)/skipStdv)
+        if "stay" in mode:
+            deviations.append((read[1] - stayMean)/stayStdv)
+        if "step" in mode:
+            deviations.append((stepMean - read[2])/stepStdv)
+        cutoffs.append(max(deviations))
+    cutoffs.sort()
+    numStdvs = cutoffs[int((len(cutoffs)-1)*proportion)] 
+    # want number between 0 and length - 1
+    
+    maxSkips = skipMean + numStdvs * skipStdv
+    maxStays = stayMean + numStdvs * stayStdv
+    minSteps = stepMean - numStdvs * stepStdv
+    
+    return {'maxSkips' : maxSkips if "skip" in mode else 1,
+            'maxStays' : maxStays if "stay" in mode else 1, 
+            'minSteps' : minSteps if "step" in mode else 0}
 
 if __name__ == "__main__":
-	print getSkipStayConstraints(sys.argv[1], sys.argv[2])
+    print getSkipStayConstraints(sys.argv[1], sys.argv[2])

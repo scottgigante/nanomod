@@ -30,8 +30,9 @@ import numpy as np
 from multiprocessing import cpu_count
 import re
 import h5py
+import os
 
-from utils import callSubProcess
+from utils import callSubProcess, configureLog
 from index_modifications import indexAndCleanModifications
 from summarise_modifications import countModifications
 from seq_tools import loadGenome
@@ -109,6 +110,7 @@ def parseArgs(argv):
 	
 	#parse command line options
 	options = parser.parse_args(argv)
+	configureLog(options.verbosity)
 	
 	return options
 
@@ -123,7 +125,7 @@ def callNanomod(argv):
 		# median normalise
 		# TODO: we do this twice - make this into a routine.
 		# TODO: oh no now we're modifying the raw data!
-		newReads = os.path.join(os.reads, "nanomod")
+		newReads = os.path.join(options.reads, "nanomod")
 		os.mkdir(newReads)
 		for f in os.listdir(options.reads):
 			if f.endswith(".fast5"):

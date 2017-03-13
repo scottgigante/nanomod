@@ -35,8 +35,9 @@ import sys
 from multiprocessing import cpu_count
 import tempfile
 import shutil
+import logging
 
-from utils import log, makeDir, callSubProcess
+from utils import makeDir, callSubProcess, configureLog
 from build_eventalign import buildEventalign
 from embed_eventalign import embedEventalign
 from pickle_to_currennt import convertPickle
@@ -66,12 +67,12 @@ def initialiseArgs(options):
 	newModels = os.path.join(cwd, modelsFile)
 	if (not options.force and newModels != options.nanopolishModels and 
 			os.path.isfile(newModels)):
-		log(('{} already exists in current working directory. Use --force to '
-				'overwrite.').format(modelsFile), 0, options)
+		logging.warning(('{} already exists in current working directory. Use --force to '
+				'overwrite.').format(modelsFile))
 		options.nanopolishModels = newModels
 	else:
-		log('Copying {} to current working directory.'.format(
-				options.nanopolishModels), 1, options)
+		logging.info('Copying {} to current working directory.'.format(
+				options.nanopolishModels))
 		modelsPath = os.path.dirname(options.nanopolishModels)
 		with open(options.nanopolishModels, 'r') as models:
 			for line in models.readlines():
@@ -180,6 +181,7 @@ def parseArgs(argv):
 	
 	#parse command line options
 	options = parser.parse_args(argv)
+	configureLog(options.verbosity)
 	
 	return options
 

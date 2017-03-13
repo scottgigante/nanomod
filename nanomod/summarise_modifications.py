@@ -31,11 +31,12 @@ import pysam
 import os
 import json
 import numpy as np
+import logging
 
-from utils import callSubProcess, multiprocessWrapper, log
+from utils import callSubProcess, multiprocessWrapper
 from seq_tools import loadGenome, getSeqDiff
 
-def getBayesPercentage(numMods, numUnmods, numReads, alpha):
+def getBayesPercentage(numMods, numUnmods, alpha):
 	# TODO: can we use coverage vs. numMods + numUnmods to get a clever value for alpha?
 	return float(numMods + alpha)/(numMods + numUnmods + alpha)
 
@@ -69,9 +70,40 @@ def checkReadModification(queryName, readPos, readLength, cigarTuples, reverse,
 		if readPos in modIndex[base]:
 			return base
 	return False
+	
+def checkMotif(readPos, sequenceMotif, motifModPos, seq, deletion=False):
+	# check after modpos
+	if deletion:
+		readIdx = readPos
+	else:
+		readIdx = readPos + 1
+	motifIdx = motifModPos + 1
+	while motifIdx < len(sequenceMotif[0]):
+		try:
+			if not sequenceMotif[0][motifIdx] == seq[readIdx]:
+				return False
+		except IndexError:
+			# ran out of read
+			break
+		motifIdx += 1
+		readIdx += 1
+	
+	# check before modpos
+	readIdx = readPos - 1
+	motifIdx = motifModPos - 1
+	while motifIdx >= 0:
+		try:
+			if not sequenceMotif[0][motifIdx] == seq[readIdx]:
+				return False
+		except IndexError:
+			# ran out of read
+			break
+		motifIdx -= 1
+		readIdx -= 1
+	return True
 
-def processBase(pileupColumn, alpha, modPositions, genome, contig, modDir, 
-		dtype):
+def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, modDir, 
+		dtype, options):
 	refPos = pileupColumn.reference_pos
 	
 	# check if there are any modifiable bases in this position on reference
@@ -88,9 +120,14 @@ def processBase(pileupColumn, alpha, modPositions, genome, contig, modDir,
 		return
 	
 	# count modifications
-	numMods = 0
-	numUnmods = 0
-	numNoMatch = 0
+	count = { 'M' : 0, # modified in correct motif
+			  'U' : 0, # unmodified in correct motif
+			  'u' : 0, # unmodified in incorrect motif
+			  'X' : 0, # mismatch in otherwise correct motif
+			  'x' : 0, # mismatch in incorrect motif
+			  'D' : 0, # deletion in otherwise correct motif
+			  'd' : 0  # deletion in incorrect motif
+			}
 	for read in pileupColumn.pileups:
 		# check direction
 		reverse = read.alignment.is_reverse
@@ -99,38 +136,48 @@ def processBase(pileupColumn, alpha, modPositions, genome, contig, modDir,
 			# wrong direction strand, nothing to check
 			continue
 		
-		# check if we have a match
+		# check for mismatch / deletion
 		readPos = read.query_position
-		if readPos is None:
+		if read.is_del == 1:
 			# deletion
-			numNoMatch += 1
+			if checkMotif(read.query_position_or_next, options.sequenceMotif, motifModPos, read.alignment.query_sequence, deletion=True):
+				count['D'] += 1
+			else:
+				count['d'] += 1
 			continue
 		if not (read.alignment.query_sequence[readPos] == genome[refPos]):
 			# mismatch
-			numNoMatch += 1
+			if checkMotif(readPos, options.sequenceMotif, motifModPos, read.alignment.query_sequence):
+				count['X'] += 1
+			else:
+				count['x'] += 1
 			continue
 		
-		if checkReadModification(read.alignment.query_name, readPos, 
-				read.alignment.query_length, read.alignment.cigartuples, 
-				reverse, modDir) is not False:
-			numMods += 1
-		else:
-			numUnmods += 1
-	numReads = numMods + numUnmods + numNoMatch
-	modProb = getBayesPercentage(numMods, numUnmods, numReads, alpha)
-	return np.array([(contig, refPos, modProb, numMods, numUnmods, 
-			numReads)], dtype=dtype)
+		try:
+			if checkReadModification(read.alignment.query_name, readPos, 
+					read.alignment.query_length, read.alignment.cigartuples, 
+					reverse, modDir) is not False:
+				count['M'] += 1
+			else:
+				if checkMotif(readPos, options.sequenceMotif, motifModPos, read.alignment.query_sequence):
+					count['U'] += 1
+				else:
+					count['u'] += 1
+		except IOError as e:
+			logging.warning(str(e))
+	modProb = getBayesPercentage(count['M'], count['U'], alpha)
+	return np.array([(contig, refPos, modProb, count['M'], count['U'], count['u'], count['X'], count['x'], count['D'], count['d'])], dtype=dtype)
 
-def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions, 
-		genome, modDir, dtype):
+def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions, motifModPos, 
+		genome, modDir, dtype, options):
 	bam = pysam.AlignmentFile(bamFile, "rb")
 	output = np.empty(shape=(0,), dtype=dtype)
 	for base in bam.pileup(contig, startPos, endPos):
 		refPos = base.reference_pos
 		if refPos >= startPos and refPos < endPos:
 			# window is expanded for some reason
-			baseOutput = processBase(base, alpha, modPositions, genome, contig, 
-					modDir, dtype)
+			baseOutput = processBase(base, alpha, modPositions, motifModPos, genome, contig, 
+					modDir, dtype, options)
 			if baseOutput is not None:
 				output = np.append(output, baseOutput)
 	bam.close()
@@ -163,25 +210,25 @@ def aggregateWindowCounts(modCounts, pos, row, forwardStep, backStep, contig,
 
 def countModifications(bamFile, modDir, options):
 	# TODO: allow specifying a window to reduce time cost
-	log("Indexing modification sites on reference genome...", 1, options)
+	logging.info("Indexing modification sites on reference genome...")
 	modPositions, genome = checkModifiedPositions(options)
+	motifModPos = [i for i in xrange(len(options.sequenceMotif[0])) if options.sequenceMotif[0][i] != options.sequenceMotif[1][i]][0]
 	
 	# S32 string, <u4 uint32, <f4 float32, u1 uint8 <u2 uint16
-	dtype = np.dtype("S32,<u4,<f4,u1,u1,u1")
-	aggDtype = np.dtype("S32,<u4,<u4,<f4,<u2,<u2,<u2")
+	dtype = np.dtype("S32,<u4,<f4,u1,u1,u1,u1,u1,u1,u1")
+	aggDtype = np.dtype("S32,<u4,<u4,<f4,<u2,<u2,<u2,<u2,<u2,<u2,<u2")
 	if options.window is None or options.window < 2:
-		fmt = "\t".join(["%s","%i","%lf","%i","%i","%i"])
+		fmt = "\t".join(["%s","%i","%lf","%i","%i","%i","%i","%i","%i","%i"])
 		header = "\t".join(["Chromosome", "Position", "Modified Percentage", 
-				"Count Modified", "Count Unmodified", "Coverage"])
+				"M", "U", "u", "X", "x", "D", "d"])
 		modCounts = np.empty(shape=(0,), dtype=dtype)
 	else:
-		fmt = "\t".join(["%s","%i","%i","%lf","%i","%i","%i"])
+		fmt = "\t".join(["%s","%i","%i","%lf","%i","%i","%i","%i","%i","%i","%i"])
 		header = "\t".join(["Chromosome", "Start", "Stop",
-				"Modified Percentage", "Count Modified", "Count Unmodified", 
-				"Coverage"])
+				"Modified Percentage", "M", "U", "u", "X", "x", "D", "d"])
 		modCounts = np.empty(shape=(0,), dtype=aggDtype)
 	
-	log("Analyzing read modifications...", 1, options)
+	logging.info("Analyzing read modifications...")
 	basesPerCall = 2000 
 	# pileup seems to take a minimum of 2000 even if you specify less
 	for contig in genome:
@@ -199,8 +246,8 @@ def countModifications(bamFile, modDir, options):
 		windowArray = [i for i in xrange(refStart, refEnd, basesPerCall)]
 		p = Pool(options.threads)
 		argsList = [[bamFile, contig, i, min(i+basesPerCall, refEnd), 
-				options.alpha, modPositions, genome[contig]['seq'], 
-				modDir, dtype] for i in windowArray]
+				options.alpha, modPositions, motifModPos, genome[contig]['seq'], 
+				modDir, dtype, options] for i in windowArray]
 		windows = p.map(processWindowWrapper, argsList)
 		for w in windows:
 			contigModCounts = np.append(contigModCounts, w)

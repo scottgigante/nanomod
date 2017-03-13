@@ -29,39 +29,29 @@ import sys
 import subprocess
 import traceback
 import json
+import logging
 
-__log_levels__ = ['[warning] ','[debug] ','[log] ']
+__log_levels__ = [logging.WARNING, logging.INFO, logging.DEBUG]
 
-# print a message to log depending on verbosity
-#
-# @args message The message to be logged
-# @args level The level of urgency of the message:
-#		0: warning
-#		1: debug
-# 		2: log
-# @args options Namespace object from argparse
-def log(message, level, options):
-	if level > options.verbosity:
-		return
-	if level == 0:
-		output = sys.stderr
-	else:
-		output = sys.stdout
-	print(__log_levels__[level] + message, file=output)
+# set up logging
+def configureLog(level=0):
+    if level > len(__log_levels__):
+        level = len(__log_levels__)
+    elif level < 0:
+        level = 0
+    logging.basicConfig(format='[%(levelname)s] %(message)s', level=__log_levels__[level])
 
 def preventOverwrite(file, options):
-	""" Check if we are accidentally overwriting something
-	@param file Path to file to be written
-	@param options Namespace from argparse """
-	if file is not None and os.path.isfile(file):
-		if options.force:
-			log("{} already exists. Forcing recreation.".format(file), 
-					1, options)
-		else:
-			log("{} already exists. Use --force to recompute.".format(file), 
-					0, options)
-			return True
-	return False
+    """ Check if we are accidentally overwriting something
+    @param file Path to file to be written
+    @param options Namespace from argparse """
+    if file is not None and os.path.isfile(file):
+        if options.force:
+            logging.info("{} already exists. Forcing recreation.".format(file))
+        else:
+            logging.warning("{} already exists. Use --force to recompute.".format(file))
+            return True
+    return False
 
 # call subprocess to create a new file using an external script if the file 
 # doesn't already exist
@@ -76,61 +66,61 @@ def preventOverwrite(file, options):
 # @args shell Use local shell
 # @args mode Writing mode: choose from w, wb, a
 def callSubProcess(call, options, newFile=None, outputFile=None, close_fds=True, 
-		shell=True, mode='w'):
-	try:
-		# we should use shell=False to make this more portable
-		# print call to debug
-		log(call if shell else " ".join(call), 1, options)
-	
-		if preventOverwrite(newFile, options):
-			return 1
-		
-		if outputFile is not None:
-			out=open(outputFile, mode)
-		elif options.verbosity < 2:
-			# don't print stdout from subprocess
-			out=open(os.devnull, 'w')
-		else:
-			out=sys.stdout
-		subprocess.call(call, stdout=out, close_fds=close_fds, shell=shell)
-	
-		# check the file was created, if given
-		assert(newFile is None or os.path.isfile(newFile))
-	except OSError as e:
-		log("OSError: has a dependency changed path? Try deleting nanomod/.*.config.json and try again.", 0, options)
-		# TODO: fix this automatically - maybe a --check-dependencies option?
-		raise e
-	return 0
+        shell=True, mode='w'):
+    try:
+        # we should use shell=False to make this more portable
+        # print call to debug
+        logging.info(call if shell else " ".join(call))
+    
+        if preventOverwrite(newFile, options):
+            return 1
+        
+        if outputFile is not None:
+            out=open(outputFile, mode)
+        elif options.verbosity < 2:
+            # don't print stdout from subprocess
+            out=open(os.devnull, 'w')
+        else:
+            out=sys.stdout
+        subprocess.call(call, stdout=out, close_fds=close_fds, shell=shell)
+    
+        # check the file was created, if given
+        assert(newFile is None or os.path.isfile(newFile))
+    except OSError as e:
+        logging.warning("OSError: has a dependency changed path? Try deleting nanomod/.*.config.json and try again.")
+        # TODO: fix this automatically - maybe a --check-dependencies option?
+        raise e
+    return 0
 
 # create a directory, if it doesn't already exist
 #
 # @args dir The directory to be created
-# @return None	
+# @return None    
 def makeDir(dir):
-	try:
-		os.mkdir(dir)
-	except OSError:
-		# already exists
-		pass
+    try:
+        os.mkdir(dir)
+    except OSError:
+        # already exists
+        pass
 
 def loadJson(filename):
-	with open(filename, 'r') as inFh:
-		data = json.load(inFh)
-	return data
+    with open(filename, 'r') as inFh:
+        data = json.load(inFh)
+    return data
 
 def saveJson(filename, data):
-	with open(filename, 'w') as outFh:
-		json.dump(data, fp=outFh, indent=4)
-		
+    with open(filename, 'w') as outFh:
+        json.dump(data, fp=outFh, indent=4)
+        
 # multiprocessing.Pool.map() wrapper for functions taking more than one argument
 # @args func the function to be called
 # @args args an array of arguments for the function
 # @return return value of called function
 def multiprocessWrapper(func, args):
-	try:
-		return func(*args)
-	except Exception as e:
-		print('Caught exception in worker thread:')
-		traceback.print_exc()
-		print()
-		raise e
+    try:
+        return func(*args)
+    except Exception as e:
+        logging.error('Caught exception in worker thread:')
+        traceback.print_exc()
+        print()
+        raise e

@@ -31,7 +31,7 @@ from multiprocessing import Pool
 from functools import partial
 import subprocess
 
-from utils import callSubProcess, log, multiprocessWrapper, preventOverwrite
+from utils import callSubProcess, multiprocessWrapper, preventOverwrite
 from . import __exe__
 
 # custom use of subprocess for poretools to allow special return value for multiprocessing
@@ -42,8 +42,7 @@ from . import __exe__
 # @return Name of the fasta file that was written
 def callPoretools(call, options, idx):
 	outfile = os.path.join(options.tempDir, "{}.fasta".format(idx))
-	log("Poretools: {} files, output to {}.".format(len(call)-2, outfile), 2, 
-			options)
+	logging.debug("Poretools: {} files, output to {}.".format(len(call)-2, outfile))
 	f = open(outfile, 'w')
 	subprocess.call(call, stdout=f, shell=False)
 	f.close()
@@ -109,7 +108,7 @@ def buildEventalign(options, reads, outPrefix):
 	#		reads), options, newFile=fastaFile, outputFile=fastaFile)
 	
 	callSubProcess('{} index {}'.format(__exe__['bwa'], options.genome), 
-			options, newFile="{}.fai".format(options.genome))
+			options, newFile="{}.bwt".format(options.genome))
 			
 	sortedBamFile = "{}.sorted.bam".format(outPrefix)
 	callSubProcess(('{} mem -x ont2d -t {} {} {} | samtools view -Sb - '
