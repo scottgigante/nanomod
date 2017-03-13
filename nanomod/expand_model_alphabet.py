@@ -34,83 +34,83 @@ from seq_tools import unmodifySeq, __canonical__
 from utils import loadJson, saveJson, callSubProcess, preventOverwrite
 
 def expandAlphabet(alpha, sequenceMotif):
-	expanded = list(alpha)
-	for base in sequenceMotif[1]:
-		if base not in expanded:
-			expanded.append(base)
-	return expanded
+    expanded = list(alpha)
+    for base in sequenceMotif[1]:
+        if base not in expanded:
+            expanded.append(base)
+    return expanded
 
 def generateKmers(inAlpha, outAlpha, kmerLen, sequenceMotif):
-	badKmer = 'X'*kmerLen
-	
-	# generate original kmers
-	inKmers = all_kmers("".join(inAlpha), kmerLen)
-	inKmers.append(badKmer)
-	# create map of kmer to index in inKmers
-	inKmersMap = {k:i for i,k in enumerate(inKmers)}
-	# generate modified kmers
-	outKmers = all_kmers("".join(outAlpha), kmerLen)
-	outKmers.append(badKmer)
+    badKmer = 'X'*kmerLen
+    
+    # generate original kmers
+    inKmers = all_kmers("".join(inAlpha), kmerLen)
+    inKmers.append(badKmer)
+    # create map of kmer to index in inKmers
+    inKmersMap = {k:i for i,k in enumerate(inKmers)}
+    # generate modified kmers
+    outKmers = all_kmers("".join(outAlpha), kmerLen)
+    outKmers.append(badKmer)
 
-	# map each methylated kmer to its non-methylated equivalent
-	reverseMap = dict()
-	for i in range(len(outKmers)):
-		k = unmodifySeq(outKmers[i], sequenceMotif)
-		if inKmersMap.has_key(k):
-			reverseMap[i] = inKmersMap[k]
-		else:
-			# kmer doesn't exist
-			reverseMap[i] = None
-	return outKmers, reverseMap
+    # map each methylated kmer to its non-methylated equivalent
+    reverseMap = dict()
+    for i in range(len(outKmers)):
+        k = unmodifySeq(outKmers[i], sequenceMotif)
+        if inKmersMap.has_key(k):
+            reverseMap[i] = inKmersMap[k]
+        else:
+            # kmer doesn't exist
+            reverseMap[i] = None
+    return outKmers, reverseMap
 
 def createExpandedNetwork(inNetwork, kmers, reverseMap):
-	outNetwork = copy.deepcopy(inNetwork)
+    outNetwork = copy.deepcopy(inNetwork)
 
-	# expand softmax output and multiclass postoutput layer
-	outNetwork['layers'][-2]['size'] = len(kmers)
-	outNetwork['layers'][-1]['size'] = len(kmers)
+    # expand softmax output and multiclass postoutput layer
+    outNetwork['layers'][-2]['size'] = len(kmers)
+    outNetwork['layers'][-1]['size'] = len(kmers)
 
-	# reallocate output layer weights according to reverse map
-	outputLayer = outNetwork['layers'][-2]['name']
+    # reallocate output layer weights according to reverse map
+    outputLayer = outNetwork['layers'][-2]['name']
 
-	inputSize = len(kmers) * outNetwork['layers'][-3]['size']
-	outNetwork['weights'][outputLayer]['input'] = [0] * inputSize
-	for i in range(outNetwork['layers'][-3]['size']):
-		for j in range(len(kmers)):
-			if reverseMap[j] is not None:
-				inIdx = i * inNetwork['layers'][-3]['size'] + reverseMap[j]
-				outIdx = i * outNetwork['layers'][-3]['size'] + j
-				outNetwork['weights'][outputLayer]['input'][outIdx] = \
-						inNetwork['weights'][outputLayer]['input'][inIdx]
+    inputSize = len(kmers) * outNetwork['layers'][-3]['size']
+    outNetwork['weights'][outputLayer]['input'] = [0] * inputSize
+    for i in range(outNetwork['layers'][-3]['size']):
+        for j in range(len(kmers)):
+            if reverseMap[j] is not None:
+                inIdx = i * inNetwork['layers'][-3]['size'] + reverseMap[j]
+                outIdx = i * outNetwork['layers'][-3]['size'] + j
+                outNetwork['weights'][outputLayer]['input'][outIdx] = \
+                        inNetwork['weights'][outputLayer]['input'][inIdx]
 
-	biasSize = len(kmers)
-	outNetwork['weights'][outputLayer]['bias'] = [0] * biasSize
-	for i in range(biasSize):
-		if reverseMap[i] is not None:
-			outNetwork['weights'][outputLayer]['bias'][i] = \
-					inNetwork['weights'][outputLayer]['bias'][reverseMap[i]]
-	
-	return outNetwork
+    biasSize = len(kmers)
+    outNetwork['weights'][outputLayer]['bias'] = [0] * biasSize
+    for i in range(biasSize):
+        if reverseMap[i] is not None:
+            outNetwork['weights'][outputLayer]['bias'][i] = \
+                    inNetwork['weights'][outputLayer]['bias'][reverseMap[i]]
+    
+    return outNetwork
 
 def run(inFilename, outFilename, kmer, sequenceMotif, options=None):
-	try:
-		if preventOverwrite(outFilename, options):
-			return 1
-	except NameError:
-		# running as standalone, no such thing as options
-		pass
-	inNetwork = loadJson(inFilename)
-	alphabet = expandAlphabet(__canonical__, sequenceMotif)
-	kmers, reverseMap = generateKmers(__canonical__, alphabet, kmer, 
-			sequenceMotif)
-	outNetwork = createExpandedNetwork(inNetwork, kmers, reverseMap)
-	saveJson(outFilename, outNetwork)
+    try:
+        if preventOverwrite(outFilename, options):
+            return 1
+    except NameError:
+        # running as standalone, no such thing as options
+        pass
+    inNetwork = loadJson(inFilename)
+    alphabet = expandAlphabet(__canonical__, sequenceMotif)
+    kmers, reverseMap = generateKmers(__canonical__, alphabet, kmer, 
+            sequenceMotif)
+    outNetwork = createExpandedNetwork(inNetwork, kmers, reverseMap)
+    saveJson(outFilename, outNetwork)
 
 def expandModelAlphabet(options):
-	run(options.currenntTemplate, options.expandedTemplate, options.kmer, 
-			options.sequenceMotif, options)
-	
+    run(options.currenntTemplate, options.expandedTemplate, options.kmer, 
+            options.sequenceMotif, options)
+    
 if __name__ == "__main__":
-	args = sys.argv
-	run(args[1], args[2], int(args[3]), [args[4], args[5]])
-	
+    args = sys.argv
+    run(args[1], args[2], int(args[3]), [args[4], args[5]])
+    

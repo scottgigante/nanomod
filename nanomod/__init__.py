@@ -31,17 +31,17 @@ __version_info__ = tuple([int(num) for num in __version__.split('.')])
 __exe__ = {}
 # list of executables required by this package
 __prognames__ = { 'train' : [
-					'poretools', 
-					'bwa', 
-					'samtools', 
-					'nanopolish', 
-					'nanonettrain'
-					],#, 'currennt']
-				  'call' : [
-				  	'bwa',
-				  	'samtools',
-				  	'nanonetcall'
-				  	] }
+                    'poretools', 
+                    'bwa', 
+                    'samtools', 
+                    'nanopolish', 
+                    'nanonettrain'
+                    ],#, 'currennt']
+                  'call' : [
+                      'bwa',
+                      'samtools',
+                      'nanonetcall'
+                      ] }
 __config__ = "config.json"
 __modes__ = ["skip", "stay", "step"]
 
@@ -50,10 +50,10 @@ __modes__ = ["skip", "stay", "step"]
 # @args progname name of the executable to be run
 # @return None
 def initExecutable(progname):
-	try:
-		__exe__[progname] = os.path.abspath(os.environ[progname.upper()])
-	except KeyError:
-		__exe__[progname] = progname
+    try:
+        __exe__[progname] = os.path.abspath(os.environ[progname.upper()])
+    except KeyError:
+        __exe__[progname] = progname
 
 # Check we can an executable by requesting its help text
 #
@@ -63,29 +63,29 @@ def checkExecutable(progname):
     try:
         with open(os.devnull, 'w') as devnull:
             subprocess.call([__exe__[progname], '-h'], stdout=devnull, 
-            		stderr=devnull)
+                    stderr=devnull)
     except OSError:
         raise OSError(("Cannot execute {0}, it must be in your path as '{0}' or" 
-        		" set via the environment variable '{1}'.").format(progname, 
-        		progname.upper()))
+                " set via the environment variable '{1}'.").format(progname, 
+                progname.upper()))
 
 def loadConfig(configName):
-	with open(configName, 'r') as fh:
-		config = json.load(fh)
-		for key in config['exe']:
-			__exe__[key] = config['exe'][key]
+    with open(configName, 'r') as fh:
+        config = json.load(fh)
+        for key in config['exe']:
+            __exe__[key] = config['exe'][key]
 
 def saveConfig(configName, **config):
-	with open(configName, 'w') as fh:
-		json.dump(config, fp=fh, indent=4)
+    with open(configName, 'w') as fh:
+        json.dump(config, fp=fh, indent=4)
 
 def init(command):
-	configName = ".".join(["",command,__config__])
-	if os.path.isfile(configName):
-		loadConfig(configName)
-	else:
-		# initialise and check all executables
-		for p in __prognames__[command]:
-			initExecutable(p)
-			checkExecutable(p)
-		saveConfig(configName, exe=__exe__)
+    configName = ".".join(["",command,__config__])
+    if os.path.isfile(configName):
+        loadConfig(configName)
+    else:
+        # initialise and check all executables
+        for p in __prognames__[command]:
+            initExecutable(p)
+            checkExecutable(p)
+        saveConfig(configName, exe=__exe__)

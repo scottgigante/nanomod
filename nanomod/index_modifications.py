@@ -34,37 +34,37 @@ from seq_tools import unmodifyFasta, __canonical__
 from utils import makeDir, multiprocessWrapper, preventOverwrite
 
 def indexRead(record, outputDir, options):
-	outputFile = os.path.join(outputDir, record.id)
-	if preventOverwrite(outputFile, options):
-		return
-	modIndex = dict()
-	for i in range(len(record.seq)):
-		if record.seq[i] not in __canonical__: 
-			try:
-				modIndex[record.seq[i]].append(i)
-			except KeyError:
-				# not yet initialised
-				modIndex[record.seq[i]] = [i]
-	with open(outputFile, 'wb') as handle:
-		json.dump(modIndex, fp=handle)
+    outputFile = os.path.join(outputDir, record.id)
+    if preventOverwrite(outputFile, options):
+        return
+    modIndex = dict()
+    for i in range(len(record.seq)):
+        if record.seq[i] not in __canonical__: 
+            try:
+                modIndex[record.seq[i]].append(i)
+            except KeyError:
+                # not yet initialised
+                modIndex[record.seq[i]] = [i]
+    with open(outputFile, 'wb') as handle:
+        json.dump(modIndex, fp=handle)
 
 def indexReadWrapper(args):
-	return multiprocessWrapper(indexRead, args)
+    return multiprocessWrapper(indexRead, args)
 
 def indexAndCleanModifications(fastaFile, options):
-	outputDir = "{}.modIndex".format(options.outPrefix)
-	makeDir(outputDir)
-	
-	logging.info("Cleaning fasta of modifications...")
-	# TODO: should we avoid overwrite here? would have to reload fasta
-	unmodifiedFastaFile = "{}.unmodified.fasta".format(options.outPrefix)
-	fasta = unmodifyFasta(fastaFile, unmodifiedFastaFile, options.sequenceMotif)
-	
-	logging.info("Indexing modifications on reads...")
-	p = Pool(options.threads)
-	p.map(indexReadWrapper, [[i, outputDir, options] for i in fasta])
-	
-	return unmodifiedFastaFile, outputDir
-	
+    outputDir = "{}.modIndex".format(options.outPrefix)
+    makeDir(outputDir)
+    
+    logging.info("Cleaning fasta of modifications...")
+    # TODO: should we avoid overwrite here? would have to reload fasta
+    unmodifiedFastaFile = "{}.unmodified.fasta".format(options.outPrefix)
+    fasta = unmodifyFasta(fastaFile, unmodifiedFastaFile, options.sequenceMotif)
+    
+    logging.info("Indexing modifications on reads...")
+    p = Pool(options.threads)
+    p.map(indexReadWrapper, [[i, outputDir, options] for i in fasta])
+    
+    return unmodifiedFastaFile, outputDir
+    
 
-	
+    
