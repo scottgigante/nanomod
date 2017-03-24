@@ -29,16 +29,11 @@ import json
 from nanonet.util import all_kmers
 import copy
 import sys
+import numpy as np
 
-from seq_tools import unmodifySeq, __canonical__
+from seq_tools import unmodifySeq, __canonical__, expandAlphabet
 from utils import loadJson, saveJson, callSubProcess, preventOverwrite
 
-def expandAlphabet(alpha, sequenceMotif):
-    expanded = list(alpha)
-    for base in sequenceMotif[1]:
-        if base not in expanded:
-            expanded.append(base)
-    return expanded
 
 def generateKmers(inAlpha, outAlpha, kmerLen, sequenceMotif):
     badKmer = 'X'*kmerLen
@@ -60,6 +55,7 @@ def generateKmers(inAlpha, outAlpha, kmerLen, sequenceMotif):
             reverseMap[i] = inKmersMap[k]
         else:
             # kmer doesn't exist
+            #reverseMap[i] = np.random.randint(len(inKmers))
             reverseMap[i] = None
     return outKmers, reverseMap
 
@@ -96,11 +92,11 @@ def run(inFilename, outFilename, kmer, sequenceMotif, options=None):
     try:
         if preventOverwrite(outFilename, options):
             return 1
-    except NameError:
+    except AttributeError:
         # running as standalone, no such thing as options
         pass
     inNetwork = loadJson(inFilename)
-    alphabet = expandAlphabet(__canonical__, sequenceMotif)
+    alphabet = expandAlphabet(sequenceMotif, __canonical__)
     kmers, reverseMap = generateKmers(__canonical__, alphabet, kmer, 
             sequenceMotif)
     outNetwork = createExpandedNetwork(inNetwork, kmers, reverseMap)

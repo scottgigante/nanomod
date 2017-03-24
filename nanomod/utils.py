@@ -35,8 +35,8 @@ __log_levels__ = [logging.WARNING, logging.INFO, logging.DEBUG]
 
 # set up logging
 def configureLog(level=0):
-    if level > len(__log_levels__):
-        level = len(__log_levels__)
+    if level >= len(__log_levels__):
+        level = len(__log_levels__) - 1
     elif level < 0:
         level = 0
     logging.basicConfig(format='[%(levelname)s] %(message)s', level=__log_levels__[level])

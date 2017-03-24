@@ -28,6 +28,7 @@
 from Bio import SeqIO, Seq
 import os
 from copy import copy
+import numpy as np
 
 __canonical__ = ['A','G','C','T']
 wildcards = { 'W' : ['A', 'T'],
@@ -47,6 +48,13 @@ wildcards = { 'W' : ['A', 'T'],
 def explodeMotifs(sequenceMotifs):
     # NOT YET IMPLEMENTED
     exit(1)
+
+def expandAlphabet(sequenceMotif, alphabet=__canonical__):
+    expanded = list(alphabet)
+    for base in sequenceMotif[1]:
+        if base not in expanded:
+            expanded.append(base)
+    return expanded
 
 def unmodifyFasta(inFile, outFile, sequenceMotif):
     """Load a fasta file and clean it of base modifications, returning the 
@@ -113,6 +121,14 @@ def getKmer(genome, chromosome, pos, kmer, forward):
         start_pos = -stop_pos
         stop_pos = -pos
     return str(seq[start_pos:stop_pos])
+
+def randomPermuteSeq(seq, alphabet, rate):
+	for i in range(len(seq)):
+		if np.random.rand() < rate:
+			seq = list(seq)
+			seq[i] = alphabet[np.random.randint(len(alphabet))]
+			seq = "".join(seq)
+	return seq
 
 # apply base modification to a sequence
 #

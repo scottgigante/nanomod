@@ -160,11 +160,11 @@ def parseArgs(argv):
     parser.add_argument("--nanonet-template", dest="nanonetTemplate",
             default="models/r9_template.npy", 
             help="Nanonet model file for network initialisation")
+    parser.add_argument("--error-rate", default=0.001, type=float, 
+    		dest="rate", help="Randomly introduce errors to avoid overfitting.")
     parser.add_argument("--force", default=False, action="store_true", 
             dest="force", help="Force recreation of extant files")
             # TODO: make this ranked? eg force 1, force 8?
-    parser.add_argument("--num-reads", type=int, default=-1, dest="numReads", 
-            help="Limit the number of reads to be analysed")
     parser.add_argument("--val-fraction", type=float, default=0.05, 
             dest="valFraction", help="Fraction of data used for validation set")
     parser.add_argument("--data-fraction", type=float, default=1,
@@ -175,9 +175,11 @@ def parseArgs(argv):
             dest="selectMode")
     parser.add_argument("--read-length", default=2000, type=int, 
             dest="readLength", help="Minimum read length for training reads.")
-    parser.add_argument("--no-normalize", default=True, action="store_false", 
+    parser.add_argument("--no-normalize", default=False, action="store_true", 
             dest="noNormalize", 
             help="do not apply median normalization before run")
+    parser.add_argument("--num-reads", type=int, default=-1, dest="numReads", 
+            help="Limit the number of reads to be analysed")
     
     #parse command line options
     options = parser.parse_args(argv)

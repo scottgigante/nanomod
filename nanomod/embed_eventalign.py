@@ -145,7 +145,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 # @args idx headers index of eventalign file
 # @args fast5Path path to original fast5 file
 # @return two-element array containing basename of fast5 file and string reference to either training or validation dataset
-def processRead(options, idx, fast5Path, genome, modified, kmer):
+def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
     
     fast5File = fast5Path.split('/')[-1]
     try:
@@ -206,6 +206,8 @@ def processRead(options, idx, fast5Path, genome, modified, kmer):
             seq_pos = last_seq_pos + seq_pos_diff
         
         seq = getKmer(genome, chromosome, current_ref_index, kmer, forward)
+        if options.rate > 0:
+        	seq = randomPermuteSeq(seq, alphabet, options.rate)
         
         if last_ref_index == current_ref_index:
             numStays += 1
@@ -425,10 +427,11 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
     logging.info("Splitting eventalign into separate files...")
     filenames, idx, premadeFilenames, kmer = writeTempFiles(options, eventalign, refs)
     pool = Pool(options.threads)
+    alphabet = expandAlphabet(options.sequenceMotif)
     
     logging.info("Embedding labels into {} fast5 files...".format(len(filenames)))
     trainData = pool.map(processReadWrapper, 
-            [[options, idx, i, genome, modified, kmer] for i in filenames])
+            [[options, idx, i, genome, modified, kmer, alphabet] for i in filenames])
     
     logging.info("Adding data for {} premade fast5 files...".format(len(premadeFilenames)))
     trainData.extend(pool.map(checkPremadeWrapper, 
