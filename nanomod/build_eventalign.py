@@ -98,14 +98,17 @@ def multithreadPoretools(poretools, options, reads, output, filesPerCall=1000):
 def buildEventalign(options, reads, outPrefix):
     
     fastaFile = '{}.fasta'.format(outPrefix)
-    #multithreadPoretools(__exe__['poretools'], options, reads, fastaFile)
-    #poretoolsMaxFiles = 1000
-    callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X {} fasta ' 
-            '--type fwd {}').format(reads, 
-            __exe__['poretools'],"{}"), options, newFile=fastaFile, 
-            outputFile=fastaFile)
-    #callSubProcess(('{} fasta --type fwd {}').format(__exe__['poretools'], 
-    #        reads), options, newFile=fastaFile, outputFile=fastaFile)
+    
+    if False:
+        callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X {} fasta ' 
+                '--type fwd {}').format(reads, 
+                __exe__['poretools'],"{}"), options, newFile=fastaFile, 
+                outputFile=fastaFile)
+    else:
+        multithreadPoretools(__exe__['poretools'], options, reads, fastaFile)
+        poretoolsMaxFiles = 1000
+        callSubProcess(('{} fasta --type fwd {}').format(__exe__['poretools'], 
+                reads), options, newFile=fastaFile, outputFile=fastaFile)
     
     callSubProcess('{} index {}'.format(__exe__['bwa'], options.genome), 
             options, newFile="{}.bwt".format(options.genome))
