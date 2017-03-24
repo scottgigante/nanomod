@@ -30,6 +30,7 @@ import glob
 from multiprocessing import Pool
 from functools import partial
 import subprocess
+import logging
 
 from utils import callSubProcess, multiprocessWrapper, preventOverwrite
 from . import __exe__
@@ -113,11 +114,12 @@ def buildEventalign(options, reads, outPrefix):
     callSubProcess('{} index {}'.format(__exe__['bwa'], options.genome), 
             options, newFile="{}.bwt".format(options.genome))
             
+    samFile = "{}.sam".format(outPrefix)
+    callSubProcess('{} mem -x ont2d -t {} {} {}'.format(__exe__['bwa'], options.threads,
+            options.genome, fastaFile), options, outputFile=samFile, newFile=samFile)
+    
     sortedBamFile = "{}.sorted.bam".format(outPrefix)
-    callSubProcess(('{} mem -x ont2d -t {} {} {} | samtools view -Sb - '
-            '| samtools sort -o {} -').format(__exe__['bwa'], options.threads,
-            options.genome, fastaFile, sortedBamFile), options, 
-            newFile=sortedBamFile)
+    callSubProcess('samtools sort -o {} -O bam -@ {} -T nanomod {}'.format(sortedBamFile, options.threads, samFile), options, newFile = sortedBamFile)
     
     callSubProcess('{} index {}'.format(__exe__['samtools'], sortedBamFile), 
             options, newFile="{}.bai".format(sortedBamFile))
