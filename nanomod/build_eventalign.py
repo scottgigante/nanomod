@@ -112,7 +112,7 @@ def buildEventalign(options, reads, outPrefix):
             
     sortedBamFile = "{}.sorted.bam".format(outPrefix)
     callSubProcess(('{} mem -x ont2d -t {} {} {} | samtools view -Sb - '
-            '| samtools sort -f - {}').format(__exe__['bwa'], options.threads,
+            '| samtools sort -o {} -').format(__exe__['bwa'], options.threads,
             options.genome, fastaFile, sortedBamFile), options, 
             newFile=sortedBamFile)
     
