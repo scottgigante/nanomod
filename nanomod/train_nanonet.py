@@ -38,4 +38,4 @@ def trainNanonet(options):
                    "{4} --model {5} --cuda").format(__exe__['nanonettrain'], 
                    options.outPrefix, options.kmer, options.parallelSequences, 
                    options.tempDir, options.extendedTemplate)
-    # return ???
+    # TODO: what should we return
