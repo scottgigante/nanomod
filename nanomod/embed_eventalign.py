@@ -244,7 +244,7 @@ def writeTempFiles(options, eventalign, refs):
     if not os.path.exists(options.tempDir):
         os.makedirs(options.tempDir)
     
-    with open(eventalign) as tsv:
+    with open(eventalign, 'r') as tsv:
         
         # open file
         reader = csv.reader(tsv, delimiter="\t")
@@ -261,7 +261,12 @@ def writeTempFiles(options, eventalign, refs):
         idx['stdv'] = headers.index("event_stdv")
         idx['length'] = headers.index("event_length")
         
-        kmer=None
+        line = reader.next()
+        kmer=len(line[idx['ref_kmer']])
+        # TODO: can we do this without reopening?    
+    
+    with open(eventalign, 'r') as tsv:
+        reader.next() # headers
         current_read_name = ""
         skip=True
         tmp=None
@@ -271,12 +276,9 @@ def writeTempFiles(options, eventalign, refs):
         
         for line in reader:
             
-            if line[idx['read_name']] == current_read_name and skip:
+            if skip and line[idx['read_name']] == current_read_name:
                 continue
             elif line[idx['read_name']] != current_read_name:
-                if kmer is None:
-                    # need to initialise kmer length
-                    kmer = len(line[idx['ref_kmer']])
                 if tmp is not None and len(tmp) > 0:
                     try:
                         np.save(filename,tmp)
@@ -306,24 +308,20 @@ def writeTempFiles(options, eventalign, refs):
                 
                 outfile = getOutfile(fast5Name, options)
                 filename = os.path.join(options.tempDir, fast5Name)
-                if (not options.force) and os.path.isfile(outfile):
-                    logging.debug(outfile + " already exists. Use --force to recompute.")
+                if preventOverwrite(outfile, options.force):
                     skip=True
                     n += 1
                     premadeFilenames.add(fast5Name)
                     continue
-                elif (not options.force) and os.path.isfile(filename + ".npy"):
-                    logging.debug(("{}.npy already exists. Use --force to " 
-                            "recompute.").format(filename))
+                elif preventOverwrite(filename + ".npy", options.force):
                     skip=True
+                    n += 1
                     filenames.add(fast5Path)
-                    assert(tmp == [])
                     continue
                 
                 filenames.add(fast5Path)
                 skip=False
             
-            assert(skip==False)
             tmp.append(line)
         
         # last one gets missed
