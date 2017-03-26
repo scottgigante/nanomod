@@ -38,6 +38,21 @@ from shutil import copyfile
 from . import __exe__
 
 def parseRegion(region):
+    """
+    Parse a region specification.
+    
+    :param region: String region specification
+    
+    :raises argparse.ArgumentTypeError: raises an error if format not recognised
+    
+    :returns contig: String contig / chromosome name
+    :returns start: integer start position (0-based)
+    :returns end: integer end position (1-based)
+    
+    >>> parseRegion("chr1:1000-2000")
+    ("chr1", 1000, 2000)
+    
+    """
     region = ''.join(region.split()) # remove whitespace
     region = re.split(':|-', region)
     start = 0
@@ -50,60 +65,67 @@ def parseRegion(region):
         contig = region[0]
         try:
             start = int(re.sub(",|\.", "", region[1]))
+        except IndexError:
+            pass
+        try:
             end = int(re.sub(",|\.", "", region[2]))
         except IndexError:
-            # no worries, we don't have to specify a window
             pass
         finally:
             return contig, start, end
 
-# run main script
-# 
-# @args argv sys.argv
-# @return None
+def normaliseReads(reads):
+    """
+    Normalise raw signal using median normalization
+    
+    :param reads: String path to fast5 files
+    
+    :returns: String path to normalized fast5 files
+    
+    TODO: does nanonetcall use raw signal or event data?
+    """
+    # TODO: we do this twice - make this into a routine.
+    newReads = os.path.join(options.reads, "nanomod")
+    os.mkdir(newReads)
+    for f in os.listdir(options.reads):
+        if f.endswith(".fast5"):
+            path = os.path.join(options.reads, f)
+            newPath = os.path.join(options.reads, "nanomod", f)
+            copyfile(path, newPath)
+            with h5py.File(newPath, 'r+') as f:
+                raw_group = f["Raw/Reads"].values()[0]
+                signal = raw_group["Signal"][()]
+                med = np.median(signal)
+                median_deviation = signal - med
+                MAD = np.median(abs(median_deviation))
+                signal = median_deviation / MAD
+                del raw_group["Signal"]
+                del f["Analyses"]
+                raw_group["Signal"] = signal
+    return newReads
+
 def callNanomod(options):
+    """
+    Call base modifications on reads based on a previously built nanomod model
+     
+    :param options: Namespace object from argparse
+    """
     
     if not options.noNormalise:
-        # median normalise
-        # TODO: we do this twice - make this into a routine.
-        # TODO: oh no now we're modifying the raw data!
-        newReads = os.path.join(options.reads, "nanomod")
-        os.mkdir(newReads)
-        for f in os.listdir(options.reads):
-            if f.endswith(".fast5"):
-                path = os.path.join(options.reads, f)
-                newPath = os.path.join(options.reads, "nanomod", f)
-                copyfile(path, newPath)
-                with h5py.File(newPath, 'r+') as f:
-                    raw_group = f["Raw/Reads"].values()[0]
-                    signal = raw_group["Signal"][()]
-                    med = np.median(signal)
-                    median_deviation = signal - med
-                    MAD = np.median(abs(median_deviation))
-                    signal = median_deviation / MAD
-                    del raw_group["Signal"]
-                    raw_group["Signal"] = signal
-        options.reads = newReads
-                
+        # median normalise raw signal
+        options.reads = normaliseReads(options.reads)
     
     fastaFile = "{}.fasta".format(options.outPrefix)
-    callSubProcess([__exe__['nanonetcall'], "--chemistry", options.chemistry, 
+    args = [__exe__['nanonetcall'], "--chemistry", options.chemistry, 
             "--jobs", str(options.threads), "--model", options.model, 
-            "--output",    fastaFile, "--limit", str(options.numReads), "--section", "template", options.reads], 
-            options.force, shell=False, newFile=fastaFile)
-    # TODO: don't inclide --limit if numReads is -1
-    # TODO: fix bases
+            "--output", fastaFile, "--section", "template", options.reads]
+    if args.numReads > 0:
+        args.extend(["--limit", str(options.numReads)])
+    callSubProcess(args, options.force, shell=False, newFile=fastaFile)
     
     unmodifiedFastaFile, modDir = indexAndCleanModifications(fastaFile, options)
     
-    sortedBamFile = "{}.sorted.bam".format(options.outPrefix)
-    # TODO: we do this twice - separate into a new file?
-    callSubProcess(('{} mem -x ont2d -t {} {} {} | samtools view -Sb - '
-            '| samtools sort -f - {}').format(__exe__['bwa'], options.threads,
-            options.genome, unmodifiedFastaFile, sortedBamFile), options.force, 
-            outputFile=sortedBamFile, newFile=sortedBamFile)    
-    callSubProcess([__exe__['samtools'], 'index', sortedBamFile], options.force, 
-            shell=False)
+    sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, options.force)
     
     fmt, header, modCounts = countModifications(sortedBamFile, modDir, options)
     #wig = getWiggleTrack(modificationCounts)
