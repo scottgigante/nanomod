@@ -156,7 +156,7 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
         eventalign = np.load(os.path.join(options.tempDir, fast5File + ".npy"))
     except IOError:
         logging.warning("Failed to load {}.npy".format(os.path.join(options.tempDir, fast5File)))
-        # why on earth?!
+        # why on earth?! we just created this file!
         return [fast5File, False]
     skip = False
     
@@ -187,30 +187,22 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
     numSkips = 0
     numStays = 0
     
+    # check strand direction
+    i = 0
+    while int(eventalign[0][idx['event_index']]) == int(eventalign[1][idx['event_index']]):
+        i += 1
+    forward = int(eventalign[i][idx['event_index']]) < int(eventalign[i + 1][idx['event_index']])
+    
     for line in eventalign:
-        
-        if not line[idx['strand']] == 't':
-            # finished reading the template
-            # now reading complement of the same read - skip
-            break
         
         current_ref_index = int(line[idx['ref_pos']])
         
-        if not start:
-            if int(line[idx['event_index']]) == initial_event_index:
-                # have to skip first event to see what we have
-                continue
-            elif int(line[idx['event_index']]) > initial_event_index:
-                # forward strand
-                forward = True
-            else:
-                # reverse strand
-                forward = False
-            start = True
-            seq_pos = 0
-        else:
-            seq_pos_diff = abs(current_ref_index - last_ref_index)
+        seq_pos_diff = abs(current_ref_index - last_ref_index)
+        try:
             seq_pos = last_seq_pos + seq_pos_diff
+        except NameError:
+            # don't have a last_seq_pos, first event
+            seq_pos = 0
         
         seq = getKmer(genome, chromosome, current_ref_index, kmer, forward)
         if options.rate > 0:
@@ -235,7 +227,7 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
                 readLength, kmer, genome)
     except Exception as e:
         logging.warning("Failed to save {}.".format(fast5File))
-        print e.message
+        print str(e)
         return [fast5File, False]
     return [fast5File, pass_quality]
 
