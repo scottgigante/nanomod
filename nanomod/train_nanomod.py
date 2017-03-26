@@ -41,13 +41,14 @@ from train_nanonet import trainNanonet
 
 def clean(options):
     """
-    Clean up after ourselves. 
+    Clean up after ourselves.
     Move temporary files out of current working directory, delete temp directory.
+
     :param options: Namespace object from argparse
     """
     # delete temp files
     shutil.rmtree(options.tempDir)
-    
+
     # delete models from cwd
     modelsFile = os.path.basename(options.nanopolishModels)
     cwd = os.getcwd()
@@ -62,6 +63,7 @@ def clean(options):
 def buildTrainingSet(options, reads, outPrefix, modified=False):
     """
     Build training set for a single MinION run
+
     :param options: Namespace from argparse
     :param reads: Directory for fast5 reads
     :param outPrefix: Prefix for output files
@@ -78,6 +80,7 @@ def combineTrainingSets(options, t1, t2, outPrefix):
     """
     Combine training sets from multiple nanomod runs.
     Primary function is to combine canonical and modified training sets
+
     :param options: Namespace from argparse
     :param t1: Prefix for training set 1
     :param t2: Prefix for training set 2
@@ -89,20 +92,21 @@ def combineTrainingSets(options, t1, t2, outPrefix):
     valFile2 = "{}.val.txt.small".format(t2)
     trainFileCombined = "{}.train.txt.small".format(outPrefix)
     valFileCombined = "{}.val.txt.small".format(outPrefix)
-    callSubProcess("cat {}".format(trainFile1), options.force, 
+    callSubProcess("cat {}".format(trainFile1), options.force,
             outputFile=trainFileCombined, mode='w')
     # skip header second time
-    callSubProcess("tail -n +2 {}".format(trainFile2), options.force, 
+    callSubProcess("tail -n +2 {}".format(trainFile2), options.force,
             outputFile=trainFileCombined, mode='a')
-    callSubProcess("cat {}".format(valFile1), options.force, 
+    callSubProcess("cat {}".format(valFile1), options.force,
             outputFile=valFileCombined, mode='w')
     # skip header second time
-    callSubProcess("tail -n +2 {}".format(valFile2), options.force, 
+    callSubProcess("tail -n +2 {}".format(valFile2), options.force,
             outputFile=valFileCombined, mode='a')
 
 def trainNanomod(options):
     """
     Run nanomod training
+
     :param options: Namespace from argparse
     """
     try:
@@ -111,9 +115,9 @@ def trainNanomod(options):
             modifiedPrefix = "{}.modified".format(options.outPrefix)
             # TODO: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
             buildTrainingSet(options, options.canonicalReads, canonicalPrefix)
-            buildTrainingSet(options, options.modifiedReads, modifiedPrefix, 
+            buildTrainingSet(options, options.modifiedReads, modifiedPrefix,
                     modified=True)
-            combineTrainingSets(options, canonicalPrefix, modifiedPrefix, 
+            combineTrainingSets(options, canonicalPrefix, modifiedPrefix,
                     options.outPrefix)
             trainNanonet(options)
         else:

@@ -76,7 +76,7 @@ def unmodifySeq(seq, sequenceMotif):
 		seq = str(seq)
 	else:
 		returnBioSeq = False
-	
+
 	# we have to check partial matches at either end
 	pattern = sequenceMotif[1]
 	sub = sequenceMotif[0]
@@ -88,32 +88,32 @@ def unmodifySeq(seq, sequenceMotif):
 	return Seq.Seq(seq) if returnBioSeq else seq
 
 def parseArgs(argv):
-	
+
 	#command line options
 	parser = argparse.ArgumentParser()
-	parser.add_argument("-g", "--genome", dest="refFileName", 
+	parser.add_argument("-g", "--genome", dest="refFileName",
 			default="data/ecoli_k12.fasta", required=True)
-	parser.add_argument("-m", "--model", dest="modelFileName", 
+	parser.add_argument("-m", "--model", dest="modelFileName",
 			default="models/template_median68pA.model")
 	parser.add_argument("-r", "--reads", dest="readsFileName", required=True)
 	parser.add_argument("-k", "--kmer", default=6)
-	parser.add_argument("-o", "--out-prefix", dest="outPrefix", 
+	parser.add_argument("-o", "--out-prefix", dest="outPrefix",
 			required=True)
-	parser.add_argument("-t", "--threads", type=int, default=cpu_count(), 
+	parser.add_argument("-t", "--threads", type=int, default=cpu_count(),
 			dest="numThreads")
 	parser.add_argument("-n", "--num-reads", default=100, dest="numReads")
 	parser.add_argument("--methyl", default=0, type=float)
-	parser.add_argument("--bases", default='ACGTM')	
+	parser.add_argument("--bases", default='ACGTM')
 	parser.add_argument("-s", "--sequence-motif", dest="sequenceMotif",
 			nargs=2, default=["CG","MG"], metavar="CANONICAL MODIFIED",
 			help=("Motif of canonical and modified site (e.g., -s CG MG) "
 			"(required)"))
 	parser.add_argument("--model-seed", default=None, type=int, dest="modelSeed")
 	parser.add_argument("--data-seed", default=None, type=int, dest="dataSeed")
-	
+
 	#parse command line options
 	options = parser.parse_args()
-	
+
 	return options
 
 def loadRef(fasta):
@@ -124,7 +124,7 @@ def loadRef(fasta):
 		refs[record.id] = str(record.seq)
 	handle.close()
 	return refs
-	
+
 def loadModel(modelFile, options):
 	model = dict()
 	with open(modelFile, "r") as tsv:
@@ -138,7 +138,7 @@ def loadModel(modelFile, options):
 			else:
 				# kmer	level_mean	level_stdv	sd_mean	sd_stdv	weight
 				model[line[0]] = [float(line[i]) for i in range(1,len(line))]
-	
+
 	# create methylated model
 	levelMeanOffsetMean = numpy.random.normal(0, 2, 6)
 	levelMeanOffsetSd = numpy.random.wald(0.8, 1, 6)
@@ -156,13 +156,13 @@ def loadModel(modelFile, options):
 			diff = [i for i in list(ndiff(l, unmodified)) if not i[0] == '+' ]
 			locs = [i for i in range(len(diff)) if diff[i][0] == '-']
 			for i in locs:
-				model[l][0] += numpy.random.normal(levelMeanOffsetMean[i], 
+				model[l][0] += numpy.random.normal(levelMeanOffsetMean[i],
 						levelMeanOffsetSd[i])
-				model[l][1] += numpy.random.normal(levelSdOffsetMean[i], 
+				model[l][1] += numpy.random.normal(levelSdOffsetMean[i],
 						levelSdOffsetSd[i])
-				model[l][2] += numpy.random.normal(sdMeanOffsetMean[i], 
+				model[l][2] += numpy.random.normal(sdMeanOffsetMean[i],
 						sdMeanOffsetSd[i])
-				model[l][3] += numpy.random.normal(sdSdOffsetMean[i], 
+				model[l][3] += numpy.random.normal(sdSdOffsetMean[i],
 						sdSdOffsetSd[i])
 	return model
 
@@ -186,7 +186,7 @@ def restrictMethylToCpG(labels):
 
 def methylateSeq(seq):
 	# simply replacing CG with MG leaves out sequences ending in C that could be methylated
-	# as a result, we can't use the last base of the sequence effectively	
+	# as a result, we can't use the last base of the sequence effectively
 	return seq.replace("CG","MG")
 
 def methylateChromosome(ref, options):
@@ -200,10 +200,10 @@ def methylateChromosome(ref, options):
 		else:
 			newRef.append(options.sequenceMotif[0])
 	return ''.join(newRef)
-	
+
 def reverseComplement(seq):
 	# reverse
-	seq = seq[::-1]	
+	seq = seq[::-1]
 	# complement
 	# from http://stackoverflow.com/questions/6116978/python-replace-multiple-strings
 	# in order to avoid double changes, use symbols first
@@ -249,7 +249,7 @@ def createFast5(options, i, chromosomeLength, ref, chromosome, model):
 			# no samples - skip!
 			skips += 1
 			continue
-			
+
 		samples = numpy.random.normal(level,stdv,num_samples)
 		sample_mean = numpy.mean(samples)
 		sample_stdv = sqrt(numpy.var(samples))
@@ -263,7 +263,7 @@ def createFast5(options, i, chromosomeLength, ref, chromosome, model):
 		basecall.append((sample_mean, squiggle_start/_HERTZ, sample_stdv, sample_length, ref_kmer, 0, 1, 1, ref_kmer, 0, 0, 0, 0, 0))
 		assert(len(basecall) == j-skips+1)
 		assert(len(basecall) == len(read_squiggle))
-	
+
 	# output .fast5 read
 	with h5py.File(read_name, "r+") as fast5:
 		raw_group = fast5.get("Raw/Reads")
@@ -272,19 +272,19 @@ def createFast5(options, i, chromosomeLength, ref, chromosome, model):
 		raw = numpy.array(raw, dtype=raw_dset.dtype)
 		raw_dset.resize((raw.shape[0],))
 		raw_dset[()] = raw
-		
+
 		event_group = fast5.get("Analyses/EventDetection_000/Reads")
 		event_group.move("Read_0","Read_{}".format(i))
 		event_dset = event_group.get("Read_{}/Events".format(i))
 		events = numpy.array(events, dtype=event_dset.dtype)
 		event_dset.resize((events.shape[0],))
 		event_dset[()] = events
-		
+
 		basecall_dset = fast5.get("Analyses/Basecall_1D_000/BaseCalled_template/Events")
 		basecall = numpy.array(basecall, dtype=basecall_dset.value.dtype)
 		basecall_dset.resize((basecall.shape[0],))
 		basecall_dset[()] = basecall
-		
+
 	return read_squiggle, ref[chromosome][read_start:read_end+options.kmer]
 
 def multi_run_wrapper(args):
@@ -319,8 +319,8 @@ def extractReads(options):
 	# output eventalign
 	with open("{}.eventalign".format(options.outPrefix), "w") as eventalign, open("{}.fasta".format(options.outPrefix), 'w') as fasta:
 		writer = csv.writer(eventalign, delimiter='\t')
-		writer.writerow(["contig", "position", "reference_kmer", "read_name", 
-				"strand", "event_index", "event_level_mean", "event_stdv", 
+		writer.writerow(["contig", "position", "reference_kmer", "read_name",
+				"strand", "event_index", "event_level_mean", "event_stdv",
 				"event_length", "model_kmer", "model_mean", "model_stdv"])
 		for read, seq in squiggle:
 			try:

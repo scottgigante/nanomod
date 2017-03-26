@@ -33,12 +33,12 @@ from seq_tools import expandAlphabet
 # @args options Namespace object from argparse
 # @return None
 def trainNanonet(options):
-    
+
     logging.info(("{0} --train {1} --train_list {1}.train.txt.small --val {1}"
-                   " --val_list {1}.val.txt.small --output {1} --kmer_length " 
+                   " --val_list {1}.val.txt.small --output {1} --kmer_length "
                    "{2} --parallel_sequences {3} --workspace {4} --cache_path "
-                   "{4} --model {5} --bases {6} --cuda").format(__exe__['nanonettrain'], 
-                   options.outPrefix, options.kmer, options.parallelSequences, 
+                   "{4} --model {5} --bases {6} --cuda").format(__exe__['nanonettrain'],
+                   options.outPrefix, options.kmer, options.parallelSequences,
                    options.tempDir, options.expandedTemplate, "".join(expandAlphabet(options.sequenceMotif))))
     return None
     # TODO: what should we return

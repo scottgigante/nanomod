@@ -47,22 +47,22 @@ def checkModifiedPositions(options):
     for contig in canonGenome:
         modPositions[contig] = dict()
         modPositions[contig]['+'] = getSeqDiff(
-                canonGenome[contig]['seq'], 
+                canonGenome[contig]['seq'],
                 modGenome[contig]['seq'])
         modPositions[contig]['-'] = getSeqDiff(
-                canonGenome[contig]['reverseSeq'], 
-                modGenome[contig]['reverseSeq'])    
+                canonGenome[contig]['reverseSeq'],
+                modGenome[contig]['reverseSeq'])
     return modPositions, canonGenome
 
-def checkReadModification(queryName, readPos, readLength, cigarTuples, reverse, 
+def checkReadModification(queryName, readPos, readLength, cigarTuples, reverse,
         modDir):
     # TODO: check that this checks the correct position
     if reverse:
-        readPos = -readPos-1 
+        readPos = -readPos-1
         readPos += readLength
     startHardClip = cigarTuples[0][1] if cigarTuples[0][0] == 5 else 0
     readPos += startHardClip
-    
+
     modFile = os.path.join(modDir, queryName)
     with open(modFile, 'rb') as handle:
         modIndex = json.load(handle)
@@ -70,7 +70,7 @@ def checkReadModification(queryName, readPos, readLength, cigarTuples, reverse,
         if readPos in modIndex[base]:
             return base
     return False
-    
+
 def checkMotif(readPos, sequenceMotif, motifModPos, seq, deletion=False):
     # check after modpos
     if deletion:
@@ -87,7 +87,7 @@ def checkMotif(readPos, sequenceMotif, motifModPos, seq, deletion=False):
             break
         motifIdx += 1
         readIdx += 1
-    
+
     # check before modpos
     readIdx = readPos - 1
     motifIdx = motifModPos - 1
@@ -102,14 +102,14 @@ def checkMotif(readPos, sequenceMotif, motifModPos, seq, deletion=False):
         readIdx -= 1
     return True
 
-def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, modDir, 
+def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, modDir,
         dtype, options):
     refPos = pileupColumn.reference_pos
-    
+
     # check if there are any modifiable bases in this position on reference
     checkFwd = False
     checkReverse = False
-    refName = pileupColumn.reference_name    
+    refName = pileupColumn.reference_name
     if refPos in modPositions[refName]['+']:
         checkFwd = True
     if (-refPos-1+len(genome)) in modPositions[refName]['-']:
@@ -118,7 +118,7 @@ def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, 
     if not (checkFwd or checkReverse):
         # ref genome is not modified here
         return
-    
+
     # count modifications
     count = { 'M' : 0, # modified in correct motif
               'U' : 0, # unmodified in correct motif
@@ -135,7 +135,7 @@ def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, 
                 (not reverse and not checkFwd)):
             # wrong direction strand, nothing to check
             continue
-        
+
         # check for mismatch / deletion
         readPos = read.query_position
         if read.is_del == 1:
@@ -152,10 +152,10 @@ def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, 
             else:
                 count['x'] += 1
             continue
-        
+
         try:
-            if checkReadModification(read.alignment.query_name, readPos, 
-                    read.alignment.query_length, read.alignment.cigartuples, 
+            if checkReadModification(read.alignment.query_name, readPos,
+                    read.alignment.query_length, read.alignment.cigartuples,
                     reverse, modDir) is not False:
                 count['M'] += 1
             else:
@@ -168,7 +168,7 @@ def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, 
     modProb = getBayesPercentage(count['M'], count['U'], alpha)
     return np.array([(contig, refPos, modProb, count['M'], count['U'], count['u'], count['X'], count['x'], count['D'], count['d'])], dtype=dtype)
 
-def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions, motifModPos, 
+def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions, motifModPos,
         genome, modDir, dtype, options):
     bam = pysam.AlignmentFile(bamFile, "rb")
     output = np.empty(shape=(0,), dtype=dtype)
@@ -176,22 +176,22 @@ def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions, motifM
         refPos = base.reference_pos
         if refPos >= startPos and refPos < endPos:
             # window is expanded for some reason
-            baseOutput = processBase(base, alpha, modPositions, motifModPos, genome, contig, 
+            baseOutput = processBase(base, alpha, modPositions, motifModPos, genome, contig,
                     modDir, dtype, options)
             if baseOutput is not None:
                 output = np.append(output, baseOutput)
     bam.close()
     return output
-    
+
 def processWindowWrapper(args):
     return multiprocessWrapper(processWindow, args)
 
-def aggregateWindowCounts(modCounts, pos, row, forwardStep, backStep, contig, 
+def aggregateWindowCounts(modCounts, pos, row, forwardStep, backStep, contig,
         aggDtype, options):
     """ forwardStep 1-based end position
     backStep 0-based start position """
     # coarse window
-    countsWindow = modCounts[range(max(0, row-backStep), 
+    countsWindow = modCounts[range(max(0, row-backStep),
             min(modCounts.shape[0], row+forwardStep))]
     afterStart = countsWindow['f1'] >= pos - backStep
     beforeEnd = countsWindow['f1'] < pos + forwardStep
@@ -203,9 +203,9 @@ def aggregateWindowCounts(modCounts, pos, row, forwardStep, backStep, contig,
     numUnmods = sum(countsWindow['f4'])
     numReads = sum(countsWindow['f5'])
     print [startPos, endPos, numReads]
-    modProb = getBayesPercentage(numMods, numUnmods, numReads, 
+    modProb = getBayesPercentage(numMods, numUnmods, numReads,
                 options.alpha)
-    return np.array([(contig, startPos, endPos, modProb, numMods, numUnmods, 
+    return np.array([(contig, startPos, endPos, modProb, numMods, numUnmods,
             numReads)], dtype=aggDtype)
 
 def countModifications(bamFile, modDir, options):
@@ -213,13 +213,13 @@ def countModifications(bamFile, modDir, options):
     logging.info("Indexing modification sites on reference genome...")
     modPositions, genome = checkModifiedPositions(options)
     motifModPos = [i for i in xrange(len(options.sequenceMotif[0])) if options.sequenceMotif[0][i] != options.sequenceMotif[1][i]][0]
-    
+
     # S32 string, <u4 uint32, <f4 float32, u1 uint8 <u2 uint16
     dtype = np.dtype("S32,<u4,<f4,u1,u1,u1,u1,u1,u1,u1")
     aggDtype = np.dtype("S32,<u4,<u4,<f4,<u2,<u2,<u2,<u2,<u2,<u2,<u2")
     if options.window is None or options.window < 2:
         fmt = "\t".join(["%s","%i","%lf","%i","%i","%i","%i","%i","%i","%i"])
-        header = "\t".join(["Chromosome", "Position", "Modified Percentage", 
+        header = "\t".join(["Chromosome", "Position", "Modified Percentage",
                 "M", "U", "u", "X", "x", "D", "d"])
         modCounts = np.empty(shape=(0,), dtype=dtype)
     else:
@@ -227,9 +227,9 @@ def countModifications(bamFile, modDir, options):
         header = "\t".join(["Chromosome", "Start", "Stop",
                 "Modified Percentage", "M", "U", "u", "X", "x", "D", "d"])
         modCounts = np.empty(shape=(0,), dtype=aggDtype)
-    
+
     logging.info("Analyzing read modifications...")
-    basesPerCall = 2000 
+    basesPerCall = 2000
     # pileup seems to take a minimum of 2000 even if you specify less
     for contig in genome:
         contigModCounts = np.empty(shape=(0,), dtype=dtype)
@@ -242,16 +242,16 @@ def countModifications(bamFile, modDir, options):
                 refStart = max(refStart, options.region[1])
                 if options.region[2] is not None:
                     refEnd = min(refEnd, options.region[2])
-        
+
         windowArray = [i for i in xrange(refStart, refEnd, basesPerCall)]
         p = Pool(options.threads)
-        argsList = [[bamFile, contig, i, min(i+basesPerCall, refEnd), 
-                options.alpha, modPositions, motifModPos, genome[contig]['seq'], 
+        argsList = [[bamFile, contig, i, min(i+basesPerCall, refEnd),
+                options.alpha, modPositions, motifModPos, genome[contig]['seq'],
                 modDir, dtype, options] for i in windowArray]
         windows = p.map(processWindowWrapper, argsList)
         for w in windows:
             contigModCounts = np.append(contigModCounts, w)
-        
+
         if options.window is None or options.window < 2:
             modCounts = np.append(modCounts, contigModCounts)
         else:
@@ -265,6 +265,6 @@ def countModifications(bamFile, modDir, options):
                 if modCounts.shape[0] == 0 or not window == modCounts[-1]:
                     # exclude duplicate rows
                     modCounts = np.append(modCounts, window)
-                    
+
     return fmt, header, modCounts
-        
+

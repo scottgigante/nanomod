@@ -57,14 +57,14 @@ def expandAlphabet(sequenceMotif, alphabet=__canonical__):
     return expanded
 
 def unmodifyFasta(inFile, outFile, sequenceMotif):
-    """Load a fasta file and clean it of base modifications, returning the 
+    """Load a fasta file and clean it of base modifications, returning the
     original fasta as an array of records."""
     fasta = []
     with open(inFile, "rU") as inHandle, open(outFile, "w") as outHandle:
         for record in SeqIO.parse(inHandle, "fasta"):
             fasta.append(record)
             unmodifiedRecord = copy(record)
-            unmodifiedRecord.seq = unmodifySeq(unmodifiedRecord.seq, 
+            unmodifiedRecord.seq = unmodifySeq(unmodifiedRecord.seq,
                     sequenceMotif)
             SeqIO.write(unmodifiedRecord, outHandle, "fasta")
     return fasta
@@ -93,7 +93,7 @@ def loadGenome(options, modified=False):
     with open(options.genome, "rU") as handle:
         for record in SeqIO.parse(handle, "fasta"):
             contig = { 'id' : record.id }
-            reverseSeq = Seq.reverse_complement(record.seq) 
+            reverseSeq = Seq.reverse_complement(record.seq)
             Seq.reverse_complement(reverseSeq)
             if modified:
                 record.seq = modifySeq(options, record.seq)
@@ -135,13 +135,13 @@ def randomPermuteSeq(seq, alphabet, rate):
 # @args seq The sequence to be modified
 # @return The modified sequence
 def modifySeq(options, seq):
-    # TODO: we do this twice - make it a method?    
+    # TODO: we do this twice - make it a method?
     if type(seq) == Seq.Seq:
         returnBioSeq = True
         seq = str(seq)
     else:
         returnBioSeq = False
-        
+
     seq = seq.replace(options.sequenceMotif[0],options.sequenceMotif[1])
     return Seq.Seq(seq) if returnBioSeq else seq
 
@@ -165,7 +165,7 @@ def unmodifySeq(seq, sequenceMotif):
         seq = str(seq)
     else:
         returnBioSeq = False
-    
+
     # we have to check partial matches at either end
     pattern = sequenceMotif[1]
     sub = sequenceMotif[0]
@@ -175,7 +175,7 @@ def unmodifySeq(seq, sequenceMotif):
     # now replace in the middle
     seq = seq.replace(pattern,sub)
     return Seq.Seq(seq) if returnBioSeq else seq
-    
+
 def getSeqDiff(s1, s2):
     """Get all positions where two sequences differ"""
     return [i for i in xrange(len(s1)) if s1[i] != s2[i]]

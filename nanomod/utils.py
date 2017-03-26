@@ -36,7 +36,7 @@ __log_levels__ = [logging.WARNING, logging.INFO, logging.DEBUG]
 def configureLog(level=0):
     """
     Set up logging based on user input to verbosity
-    
+
     :param level: Positive integer, capped at 2
     """
     if level >= len(__log_levels__):
@@ -50,10 +50,10 @@ def configureLog(level=0):
 def preventOverwrite(file, force):
     """
     Check if we are accidentally overwriting something
-    
+
     :param file: Path to file to be written
     :param force: Boolean value, force overwrite or not
-    
+
     :returns: Boolean value, prevent overwrite or not
     """
     if file is not None and os.path.isfile(file):
@@ -64,13 +64,13 @@ def preventOverwrite(file, force):
             return True
     return False
 
-def callSubProcess(call, force, newFile=None, outputFile=None, close_fds=True, 
+def callSubProcess(call, force, newFile=None, outputFile=None, close_fds=True,
         shell=True, mode='w'):
     """
-    Call subprocess to create a new file using an external script if the file 
+    Call subprocess to create a new file using an external script if the file
     doesn't already exist
     TODO: can we move away from shell calls?
-    
+
     :param call: The system call to be run as a string or array_like
     :param: Boolean value, True if we want to overwrite extant files, False otherwise
     :param newFile: File that should be created after run
@@ -83,10 +83,10 @@ def callSubProcess(call, force, newFile=None, outputFile=None, close_fds=True,
         # we should use shell=False to make this more portable
         # print call to debug
         logging.info(call if shell else " ".join(call))
-    
+
         if preventOverwrite(newFile, force):
             return 1
-        
+
         if outputFile is not None:
             out=open(outputFile, mode)
         elif logging.getLogger().isEnabledFor(logging.DEBUG):
@@ -95,7 +95,7 @@ def callSubProcess(call, force, newFile=None, outputFile=None, close_fds=True,
             # don't print stdout from subprocess
             out=open(os.devnull, 'w')
         subprocess.call(call, stdout=out, close_fds=close_fds, shell=shell)
-    
+
         # check the file was created, if given
         assert(newFile is None or os.path.isfile(newFile))
     except OSError as e:
@@ -107,7 +107,7 @@ def callSubProcess(call, force, newFile=None, outputFile=None, close_fds=True,
 def makeDir(dir):
     """
     Create a directory, if it doesn't already exist
-    
+
     :param dir: The directory to be created
     """
     try:
@@ -119,9 +119,9 @@ def makeDir(dir):
 def loadJson(filename):
     """
     Load a JSON file
-    
+
     :param filename: string File to be loaded
-    
+
     :returns: dictionary or array_like JSON output
     """
     with open(filename, 'r') as inFh:
@@ -131,7 +131,7 @@ def loadJson(filename):
 def saveJson(filename, data):
     """
     Save a JSON file
-    
+
     :param filename: string File to be loaded
     :param data: dictionary or array_like JSON input
     """
@@ -141,10 +141,10 @@ def saveJson(filename, data):
 def multiprocessWrapper(func, args):
     """
     multiprocessing.Pool.map() wrapper for functions taking more than one argument
-    
+
     :param func: the function to be called
     :param args: an array of arguments for the function
-    
+
     :returns: return value of called function
     """
     try:

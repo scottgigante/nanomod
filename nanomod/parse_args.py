@@ -38,21 +38,21 @@ import logging
 from utils import makeDir, configureLog
 from . import __modes__
 
-__description__ = { 
-    'train' : """Generates a neural network model to call DNA base 
+__description__ = {
+    'train' : """Generates a neural network model to call DNA base
                 modifications, using Oxford Nanopore Technologies' Nanonettrain.
                 Requires: poretools, bwa, samtools, nanopolish, nanonettrain""",
-    'call' : """Call DNA base modifications, using a pre-trained nanomod network. 
+    'call' : """Call DNA base modifications, using a pre-trained nanomod network.
                 Requires: nanonetcall, bwa."""
     }
 __epilog__ = {
-    'train' : """Example usage: nanomod --canonical-reads sample_data/r9/canonical 
-                --modified-reads sample_data/r9/modified --genome 
+    'train' : """Example usage: nanomod --canonical-reads sample_data/r9/canonical
+                --modified-reads sample_data/r9/modified --genome
                 sample_data/ecoli_k12_mg1655.fa --output-prefix data/test
                 --sequence-motif CG MG --threads 16 --verbose --data-fraction 0.5
                 --select-mode random""",
-    'call' : """Example usage: nanomod call --reads 
-                sample_data/r9/modified --genome sampla_data/ecoli_k12.fasta 
+    'call' : """Example usage: nanomod call --reads
+                sample_data/r9/modified --genome sampla_data/ecoli_k12.fasta
                 --model models/5mc.nanomod.npy --output-prefix data/test --threads
                 16"""
     }
@@ -62,23 +62,23 @@ __epilog__ = {
 # @args options Namespace object from argparse
 # @return None
 def initialiseTrainArgs(options):
-    
+
     # make the temp dir
     makeDir(options.tempDir)
-    options.tempDir = os.path.join(options.tempDir, 
+    options.tempDir = os.path.join(options.tempDir,
             os.path.basename(options.outPrefix))
     makeDir(options.tempDir)
     makeDir(options.outPrefix)
-    
+
     # make sure sequenceMotif is uppercase
     for i in range(len(options.sequenceMotif)):
         options.sequenceMotif[i] = options.sequenceMotif[i].upper()
-    
+
     # move models files to current working directory for eventalign
     modelsFile = os.path.basename(options.nanopolishModels)
     cwd = os.getcwd()
     newModels = os.path.join(cwd, modelsFile)
-    if (not options.force and newModels != options.nanopolishModels and 
+    if (not options.force and newModels != options.nanopolishModels and
             os.path.isfile(newModels)):
         logging.warning(('{} already exists in current working directory. Use --force to '
                 'overwrite.').format(modelsFile))
@@ -90,14 +90,14 @@ def initialiseTrainArgs(options):
         with open(options.nanopolishModels, 'r') as models:
             for line in models.readlines():
                 model = line.strip()
-                shutil.copy(os.path.join(modelsPath, model), 
+                shutil.copy(os.path.join(modelsPath, model),
                         os.path.join(cwd, model))
         shutil.copy(options.nanopolishModels, newModels)
-    
+
     # convert ONT model to json
     options.currenntTemplate = "{}.json".format(options.nanonetTemplate)
     convertPickle(options)
-    
+
     # expand model to include modifications
     options.expandedTemplate = "{}.mod.json".format(options.nanonetTemplate)
     expandModelAlphabet(options)
@@ -108,26 +108,26 @@ def addCommonArgs(parser):
     :param parser: The argument parser to be modified
     :returns: The modified argument parser
     """
-    parser.add_argument("-g", "--genome", required=True, 
+    parser.add_argument("-g", "--genome", required=True,
             dest="genome", help="Reference genome in fasta format (required)")
-    parser.add_argument("-o", "--output-prefix", dest="outPrefix", 
+    parser.add_argument("-o", "--output-prefix", dest="outPrefix",
             required=True, help="Prefix for nanomod output files")
     parser.add_argument("-s", "--sequence-motif", dest="sequenceMotif",
             nargs=2, default=["CG","MG"], metavar="CANONICAL MODIFIED",
             help=("Motif of canonical and modified site (e.g., -s CG MG) "
             "(required)")) # TODO: include in model?
-    parser.add_argument("-v","--verbose", default=0, action="count", 
+    parser.add_argument("-v","--verbose", default=0, action="count",
             dest="verbosity", help=("Can be used multiple times (e.g., -vv) "
             "for greater levels of verbosity."))
-    parser.add_argument("--num-reads", type=int, default=-1, dest="numReads", 
+    parser.add_argument("--num-reads", type=int, default=-1, dest="numReads",
             help="Limit the number of reads to be analysed")
-    parser.add_argument("--force", default=False, action="store_true", 
+    parser.add_argument("--force", default=False, action="store_true",
             dest="force", help="Force recreation of extant files") # TODO: make this ranked? eg force 1, force 8?
-    parser.add_argument("--no-normalize", default=False, action="store_true", 
-            dest="noNormalise", 
+    parser.add_argument("--no-normalize", default=False, action="store_true",
+            dest="noNormalise",
             help="do not apply median normalization before run") # TODO: can we infer this?
-    parser.add_argument("-t", "--threads", type=int, default=cpu_count(), 
-            dest="threads", 
+    parser.add_argument("-t", "--threads", type=int, default=cpu_count(),
+            dest="threads",
             help="Number of threads to be used in multiprocessing")
     return parser
 
@@ -137,22 +137,22 @@ def addCallArgs(parser):
     :param parser: The argument parser to be modified
     :returns: The modified argument parser
     """
-    
+
     #command line options
-    parser.add_argument("-r","--reads", dest="reads", 
-            required=True, 
+    parser.add_argument("-r","--reads", dest="reads",
+            required=True,
             help=("Directory in which fast5 reads are stored (required)"))
-    parser.add_argument("-m", "--model", 
+    parser.add_argument("-m", "--model",
             default="models/5mc.nanomod.npy", #required=True,
             help="Nanomod pre-trained network (required)")
     parser.add_argument("--region", type=parseRegion, metavar="CHR:START-END",
             help="Name of contig to analyze")
-    parser.add_argument("--window", type=int, metavar="SIZE", 
+    parser.add_argument("--window", type=int, metavar="SIZE",
             help="Size of window over which to aggregate calls")
     parser.add_argument("--chemistry", default="r9") # TODO: can we infer this?
-    parser.add_argument("--alpha", default=0.5, type=float, 
+    parser.add_argument("--alpha", default=0.5, type=float,
             help="Parameter for uninformative Beta prior")
-    
+
     return parser
 
 def addTrainArgs(parser):
@@ -161,41 +161,41 @@ def addTrainArgs(parser):
     :param parser: The argument parser to be modified
     :returns: The modified argument parser
     """
-    
-    parser.add_argument("-c","--canonical-reads", dest="canonicalReads", 
-            required=True, 
-            help=("Directory in which canonical-base fast5 reads are stored " 
+
+    parser.add_argument("-c","--canonical-reads", dest="canonicalReads",
+            required=True,
+            help=("Directory in which canonical-base fast5 reads are stored "
             "(required)"))
     parser.add_argument("-m", "--modified-reads", dest="modifiedReads",
             help="Directory in which modified-base fast5 reads are stored")
     parser.add_argument("-k", "--kmer", type=int, default=5,
             help="Length of kmer for network training")
-    parser.add_argument("-p", "--parallel-sequences", default=80, 
-            type=int, dest="parallelSequences", 
+    parser.add_argument("-p", "--parallel-sequences", default=80,
+            type=int, dest="parallelSequences",
             help="Number of parallel threads of execution in GPU training")
-    parser.add_argument("--temp-dir", 
-            default="{}/nanomod".format(tempfile.gettempdir()), 
+    parser.add_argument("--temp-dir",
+            default="{}/nanomod".format(tempfile.gettempdir()),
             dest="tempDir", help="Directory for nanomod temporary files")
-    parser.add_argument("--nanopolish-models", 
-            default="models/nanopolish_models.fofn", dest="nanopolishModels", 
-            help=("Nanopolish models for eventalign. " 
+    parser.add_argument("--nanopolish-models",
+            default="models/nanopolish_models.fofn", dest="nanopolishModels",
+            help=("Nanopolish models for eventalign. "
             "Note: will be copied to current working directory"))
     parser.add_argument("--nanonet-template", dest="nanonetTemplate",
-            default="models/r9_template.npy", 
+            default="models/r9_template.npy",
             help="Nanonet model file for network initialisation")
-    parser.add_argument("--error-rate", default=0.001, type=float, 
+    parser.add_argument("--error-rate", default=0.001, type=float,
             dest="rate", help="Randomly introduce errors to avoid overfitting.")
-    parser.add_argument("--val-fraction", type=float, default=0.05, 
+    parser.add_argument("--val-fraction", type=float, default=0.05,
             dest="valFraction", help="Fraction of data used for validation set")
     parser.add_argument("--data-fraction", type=float, default=1,
             dest="dataFraction", help="Fraction of data to be sent to nanonet")
     parser.add_argument("--select-mode", default=__modes__, nargs="*",
-            help=("Method for choosing reads to send to nanonet; choose any or" 
-            " all from random, {}").format(", ".join(__modes__)), 
+            help=("Method for choosing reads to send to nanonet; choose any or"
+            " all from random, {}").format(", ".join(__modes__)),
             dest="selectMode")
-    parser.add_argument("--read-length", default=2000, type=int, 
+    parser.add_argument("--read-length", default=2000, type=int,
             dest="readLength", help="Minimum read length for training reads.")
-    
+
     return parser
 
 def parseCommandArgs(command, argv):
@@ -206,9 +206,9 @@ def parseCommandArgs(command, argv):
     :raises NameError: raises error if a nonexistent command is called
     :returns: Namespace object from argparse
     """
-    
+
     parser = argparse.ArgumentParser(prog="nanomod",
-            description=(__decription__[command]), 
+            description=(__decription__[command]),
             epilog=__epilog__[command])
     parser = addCommonArgs(parser)
     if command == "call":
@@ -217,14 +217,14 @@ def parseCommandArgs(command, argv):
         parser = addTrainArgs(parser)
     else:
         raise NameError("{} command not defined".format(command))
-    
+
     options = parser.parse_args(argv)
     configureLog(options.verbosity)
     logging.debug("nanomod {} {}".format(command, " ".join(argv)))
-    
+
     if command == "train":
         initialiseTrainArgs(options)
-    
+
     return options
 
 def parseArgs():
@@ -234,10 +234,10 @@ def parseArgs():
     :returns command: Nanomod command to be called
     :returns options: argparse namespace for command line arguments
     """
-    
+
     #command line options
     parser = argparse.ArgumentParser(prog="nanomod",
-            description=("Nanopore base modification caller."), 
+            description=("Nanopore base modification caller."),
             epilog=("Commands:\n"
             "train\tTrain a neural network for a new type of modification\n"
             "call\tUse an existing trained network to call modifications on a"
@@ -247,13 +247,13 @@ def parseArgs():
             formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("command", choices=("train","call"))
     parser.add_argument("options", nargs=argparse.REMAINDER)
-    
+
     #parse command line options
     initialOptions = parser.parse_args()
-    
+
     try:
         options = parseCommandArgs(initialOptions.command, initialOptions.options)
     except NameError:
         raise argparse.ArgumentError(command, "Command {} not found".format(initialOptions.command))
-    
+
     return initialOptions.command, options

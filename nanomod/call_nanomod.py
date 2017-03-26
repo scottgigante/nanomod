@@ -41,18 +41,18 @@ from . import __exe__
 def parseRegion(region):
     """
     Parse a region specification.
-    
+
     :param region: String region specification
-    
+
     :raises argparse.ArgumentTypeError: raises an error if format not recognised
-    
+
     :returns contig: String contig / chromosome name
     :returns start: integer start position (0-based)
     :returns end: integer end position (1-based)
-    
+
     >>> parseRegion("chr1:1000-2000")
     ("chr1", 1000, 2000)
-    
+
     """
     region = ''.join(region.split()) # remove whitespace
     region = re.split(':|-', region)
@@ -78,11 +78,11 @@ def parseRegion(region):
 def normaliseReads(reads):
     """
     Normalise raw signal using median normalization
-    
+
     :param reads: String path to fast5 files
-    
+
     :returns: String path to normalized fast5 files
-    
+
     TODO: does nanonetcall use raw signal or event data?
     """
     # TODO: we do this twice - make this into a routine.
@@ -108,29 +108,29 @@ def normaliseReads(reads):
 def callNanomod(options):
     """
     Call base modifications on reads based on a previously built nanomod model
-     
+
     :param options: Namespace object from argparse
     """
-    
+
     if not options.noNormalise:
         # median normalise raw signal
         options.reads = normaliseReads(options.reads)
-    
+
     fastaFile = "{}.fasta".format(options.outPrefix)
-    args = [__exe__['nanonetcall'], "--chemistry", options.chemistry, 
-            "--jobs", str(options.threads), "--model", options.model, 
+    args = [__exe__['nanonetcall'], "--chemistry", options.chemistry,
+            "--jobs", str(options.threads), "--model", options.model,
             "--output", fastaFile, "--section", "template", options.reads]
     if args.numReads > 0:
         args.extend(["--limit", str(options.numReads)])
     callSubProcess(args, options.force, shell=False, newFile=fastaFile)
-    
+
     unmodifiedFastaFile, modDir = indexAndCleanModifications(fastaFile, options)
-    
+
     sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, options.force)
-    
+
     fmt, header, modCounts = countModifications(sortedBamFile, modDir, options)
     #wig = getWiggleTrack(modificationCounts)
-    
+
     outFile = "{}.methylation.txt".format(options.outPrefix)
     with open(outFile, 'wb') as handle:
         np.savetxt(handle, modCounts, fmt=fmt, header=header)

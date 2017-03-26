@@ -37,13 +37,13 @@ from . import __exe__
 
 def callPoretools(call, tempDir, idx):
     """
-    Custom use of subprocess for poretools to allow special return value for 
+    Custom use of subprocess for poretools to allow special return value for
     multiprocessing
-    
+
     :param call: The system call to be run
     :param tempDir: String path to directory for temporary files
     :param idx: int index of fasta file to be written to make unique naming system
-    
+
     :returns: Name of the fasta file that was written
     """
     outfile = os.path.join(tempDir, "{}.fasta".format(idx))
@@ -66,36 +66,36 @@ def callPoretoolsWrapper(args):
 def multithreadPoretools(poretools, tempDir, force, reads, output, filesPerCall=1000):
     """
     Runs poretools multithreaded on small chunks of fasta files
-    
-    Could be deprecated by find . -name "*.fast5" | parallel "poretools fasta" 
-    
+
+    Could be deprecated by find . -name "*.fast5" | parallel "poretools fasta"
+
     :param poretools: String Path to poretools
     :param tempDir: String path to directory for temporary files
     :param force: Boolean value, force creation or not
     :param output: String Path to final output fasta file
     :param filesPerCall: int number of fast5 files to combine in each call
-    
+
     TODO: why can't this handle more than eight cores? Arbitrary.
     """
     # check first that we actually want to edit
     if preventOverwrite(output, force):
         return 1
-        
+
     cwd = os.getcwd()
     os.chdir(reads)
     files = [os.path.join(cwd, reads, f) for f in glob.glob("*.fast5")]
     os.chdir(cwd)
     prefix = [poretools, "fasta", "--type", "fwd"]
-    
+
     calls = [prefix + files[i:i + filesPerCall] for i in xrange(0, len(files),
             filesPerCall)]
     args = [[calls[i], tempDir, i] for i in range(len(calls))]
-    
+
     pool = Pool(min(options.threads, 8)) # can't handle more than eight cores
     tempFastaList = pool.map(callPoretoolsWrapper, args)
     pool.close()
     pool.join()
-    
+
     # write results to a single fasta
     with open(output, 'w') as outfile:
         for fa in tempFastaList:
@@ -106,65 +106,65 @@ def multithreadPoretools(poretools, tempDir, force, reads, output, filesPerCall=
 def buildSortedBam(threads, genome, fastaFile, force):
     """
     Build an indexed sorted bam from a fasta file.
-    
+
     :param threads: int number of threads
     :param genome: string path to genome fasta file
     :param fastaFile: string path to reads fasta file
     :param force: Boolean value, force creation or not
-    
+
     :returns: string path to sorted bam file
     """
     samFile = "{}.sam".format(outPrefix)
     callSubProcess('{} mem -x ont2d -t {} {} {}'.format(__exe__['bwa'], threads,
             genome, fastaFile), force, outputFile=samFile, newFile=samFile)
-    
+
     sortedBamFile = "{}.sorted.bam".format(outPrefix)
     callSubProcess('samtools sort -o {} -O bam -@ {} -T nanomod {}'.format(sortedBamFile, threads, samFile), force, newFile = sortedBamFile)
     os.remove(samFile)
-    
-    callSubProcess('{} index {}'.format(__exe__['samtools'], sortedBamFile), 
+
+    callSubProcess('{} index {}'.format(__exe__['samtools'], sortedBamFile),
             force, newFile="{}.bai".format(sortedBamFile))
-    
+
     return sortedBamFile
 
 def buildEventalign(options, reads, outPrefix):
     """
     Build eventalign file according to nanopolish's pipeline.
-    
+
     :param options: Namespace object from argparse
-    
+
     :returns fastaFile: String Filename of fasta corresponding to reads
     :returns eventalignFile: String Filename of eventalign tsv
     """
-    
+
     fastaFile = '{}.fasta'.format(outPrefix)
     # build fasta using poretools so we have index to fast5 files
     if False:
         # GNU parallel
-        callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X {} fasta ' 
-                '--type fwd {}').format(reads, 
-                __exe__['poretools'],"{}"), options.force, newFile=fastaFile, 
+        callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X {} fasta '
+                '--type fwd {}').format(reads,
+                __exe__['poretools'],"{}"), options.force, newFile=fastaFile,
                 outputFile=fastaFile)
     elif True:
         # custom multiprocessing script
         multithreadPoretools(__exe__['poretools'], options.tempDir, options.force, reads, fastaFile)
     else:
         # single threaded poretools - slow
-        callSubProcess(('{} fasta --type fwd {}').format(__exe__['poretools'], 
+        callSubProcess(('{} fasta --type fwd {}').format(__exe__['poretools'],
                 reads), options.force, newFile=fastaFile, outputFile=fastaFile)
-    
+
     # index genome using bwa
-    callSubProcess('{} index {}'.format(__exe__['bwa'], options.genome), 
+    callSubProcess('{} index {}'.format(__exe__['bwa'], options.genome),
             options.force, newFile="{}.bwt".format(options.genome))
-    
+
     # build sorted bam file using bwa mem
     sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, options.force)
-    
+
     # run nanopolish eventalign
     eventalignFile = "{}.eventalign".format(outPrefix)
-    callSubProcess(('{} eventalign -t {} --print-read-names -r {} -b {} -g {}' 
-            ' --models {}').format(__exe__['nanopolish'], options.threads, 
-            fastaFile, sortedBamFile, options.genome, options.nanopolishModels), 
+    callSubProcess(('{} eventalign -t {} --print-read-names -r {} -b {} -g {}'
+            ' --models {}').format(__exe__['nanopolish'], options.threads,
+            fastaFile, sortedBamFile, options.genome, options.nanopolishModels),
             options.force, newFile=eventalignFile, outputFile=eventalignFile)
-    
+
     return fastaFile, eventalignFile

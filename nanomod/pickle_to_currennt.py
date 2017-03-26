@@ -93,45 +93,45 @@ def parse_layer_blstm(layer, layer_type, idx):
     # get layer description
     size = layer.layers[0].size * 2
     l = get_layer_dict(layer_type, idx, size)
-    
+
     # get raw weights from forward and reverse
     iM1, lM1, bM1, pM1 = get_lstm_weights(layer.layers[0])
     iM2, lM2, bM2, pM2 = get_lstm_weights(layer.layers[1].layer)
-    
+
     # make empty arrays
     weights = dict()
     wgts_input = np.empty([iM1.shape[0], 2, iM1.shape[1], iM1.shape[2]], dtype=np.float32)
     wgts_bias = np.empty([bM1.shape[0], 2, bM1.shape[1]], dtype=np.float32)
     wgts_internalMat = np.empty([lM1.shape[0], 2, lM1.shape[1], lM1.shape[2]], dtype=np.float32)
     wgts_internalPeep = np.empty([pM1.shape[0], 2, pM1.shape[1]], dtype=np.float32)
-    
+
     # fill arrays
     wgts_input[:, 0, :, :] = iM1
     wgts_bias[:, 0, :] = bM1
     wgts_internalMat[:, 0, :, :] = lM1
     wgts_internalPeep[:, 0, :] = pM1
-    
+
     wgts_input[:, 1, :, :] = iM2
     wgts_bias[:, 1, :] = bM2
     wgts_internalMat[:, 1, :, :] = lM2
     wgts_internalPeep[:, 1, :] = pM2
-    
+
     # transform
-    weights['input'] = wgts_input.reshape(-1,4,wgts_input.shape[1], 
-            wgts_input.shape[2], 
+    weights['input'] = wgts_input.reshape(-1,4,wgts_input.shape[1],
+            wgts_input.shape[2],
             wgts_input.shape[3]).transpose(1,2,3,4,0).reshape(-1)
     weights['bias'] = wgts_bias.reshape(-1)
     weights['internal'] = np.append(
-            wgts_internalMat.transpose(0,1,3,2).reshape(-1), 
+            wgts_internalMat.transpose(0,1,3,2).reshape(-1),
             wgts_internalPeep.reshape(-1))
     return l, weights
 
 def parse_layer_lstm(size, weights):
     l = get_layer_dict(layer_type, idx, layer.size)
-    
+
     weights=dict()
     iM, bM, lM, pM = get_lstm_weights(layer)
-    
+
     # transform
     weights['input'] = iM.transpose(0,2,1).reshape(-1)
     weights['bias'] = bM.reshape(-1)
@@ -164,7 +164,7 @@ def parse_layer(layer, idx):
         sys.stderr.write('Unsupported layer type {}.\n'.format(layer_type))
         exit(1)
     l, w = LAYER_DICT[layer_type](layer, layer_type, idx)
-    
+
     #de-numpythonise
     for key in w:
         w[key] = w[key].tolist()
@@ -193,20 +193,20 @@ def numpy_to_network(in_network):
 
     layers = list()
     weights = dict()
-    
+
     # numpy strips input layer
     layers.append(parse_layer_input(in_network))
-    
+
     i=0
     for layer in in_network.layers:
         l, w = parse_layer(layer, i)
         layers.append(l)
         weights[l['name']] = w
         i += 1
-    
+
     # numpy strips postoutput layer
     layers.append(parse_layer_multiclass(in_network))
-    
+
     return { "layers" : layers,
              "weights" : weights,
              "meta" : in_network.meta }
@@ -217,7 +217,7 @@ def runConvertPickle(in_filename, out_filename):
     except:
         sys.stderr.write('Failed to read from {}.\n'.format(in_filename))
         return 1
-    
+
     network = numpy_to_network(in_network)
     with open(out_filename, 'w') as out_network:
         json.dump(network, fp=out_network, indent=4)
@@ -228,9 +228,9 @@ def convertPickle(options):
     if preventOverwrite(options.currenntTemplate, options.force) == 1:
         return 1
     return runConvertPickle(options.nanonetTemplate, options.currenntTemplate)
-    
+
 
 if __name__ == '__main__':
     args = get_parser().parse_args()
     runConvertPickle(args.input, args.output)
-    
+

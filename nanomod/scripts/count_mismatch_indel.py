@@ -78,14 +78,14 @@ def run(filename):
 					reads += 1
 			except IndexError:
 				print line
-	return { 'averageEditDistance' : float(total_edit)/reads, 
+	return { 'averageEditDistance' : float(total_edit)/reads,
 			 'averageAlignmentScore' : float(total_score)/reads,
 			 'insertionPercent' : float(total_insert)/total_read,
 			 'deletionPercent' : float(total_delete)/total_genome,
 			 'averageReadLength' : float(total_read)/reads,
 			 'longestRead' : longest_read,
 			 'longestReadLength' : longest_read_length }
-			
+
 
 if __name__ == "__main__":
 	args = sys.argv[1:]

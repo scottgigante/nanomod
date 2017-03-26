@@ -31,10 +31,10 @@ __version_info__ = tuple([int(num) for num in __version__.split('.')])
 __exe__ = {}
 # list of executables required by this package
 __prognames__ = { 'train' : [
-                    'poretools', 
-                    'bwa', 
-                    'samtools', 
-                    'nanopolish', 
+                    'poretools',
+                    'bwa',
+                    'samtools',
+                    'nanopolish',
                     'nanonettrain'
                     ],#, 'currennt']
                   'call' : [
@@ -62,11 +62,11 @@ def initExecutable(progname):
 def checkExecutable(progname):
     try:
         with open(os.devnull, 'w') as devnull:
-            subprocess.call([__exe__[progname], '-h'], stdout=devnull, 
+            subprocess.call([__exe__[progname], '-h'], stdout=devnull,
                     stderr=devnull)
     except OSError:
-        raise OSError(("Cannot execute {0}, it must be in your path as '{0}' or" 
-                " set via the environment variable '{1}'.").format(progname, 
+        raise OSError(("Cannot execute {0}, it must be in your path as '{0}' or"
+                " set via the environment variable '{1}'.").format(progname,
                 progname.upper()))
 
 def loadConfig(configName):

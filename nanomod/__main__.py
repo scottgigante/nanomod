@@ -29,7 +29,7 @@ from parse_args import parseArgs
 from . import init
 
 # run main script
-# 
+#
 # @args argv sys.argv
 # @return None
 def run():
@@ -43,7 +43,7 @@ def run():
     else:
         # panic
         raise argparse.ArgumentError(command, "Command {} not found".format(command))
-        
+
 
 if __name__ == "__main__":
     run()

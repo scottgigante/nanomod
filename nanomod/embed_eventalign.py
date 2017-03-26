@@ -41,7 +41,7 @@ from seq_tools import *
 from utils import makeDir, multiprocessWrapper, preventOverwrite
 from check_skip_stay_prob import getSkipStayConstraints
 
-def getOutfile(fast5, options): 
+def getOutfile(fast5, options):
     """
     Get the path of the output file corresponding to a fast5 file.
 
@@ -49,16 +49,16 @@ def getOutfile(fast5, options):
     :param options: Namespace object from argparse
 
     :returns: Relative path to output fast5 file
-    
+
     TODO: remove dependence on options
     """
     return os.path.join(options.outPrefix, fast5)
 
-def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, 
+def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
         chromosome, forward, numSkips, numStays, readLength, kmer, genome):
     """
     Write a labelled fast5 file
-    
+
     :param options: Namespace object from argparse
     :param events: Structured numpy array including event labels
     :param fast5Path: String relative path to original fast5 file
@@ -74,12 +74,12 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
 
     :returns: Boolean, True: high quality read, False: low quality read
     """
-    
+
     # all events are considered good emissions - bad idea?
     events = append_fields(events, 'good_emission', events["kmer"] != 'X'*kmer)
     # remove move field - nanonet adds it
     events = drop_fields(events, "move")
-    
+
     # median normalise
     # TODO: we do this twice - make this into a routine.
     # TODO: maybe swap to nanoraw instead of eventalign
@@ -89,11 +89,11 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
         median_abs_deviation = np.median(abs(raw - med))
         events["mean"] = (events["mean"] - med) / median_abs_deviation
         events["stdv"] = events["stdv"] / median_abs_deviation
-    
-    # remove unlabelled events 
+
+    # remove unlabelled events
     # long stretches of unlabelled events severely decrease accuracy
     events = events[events["kmer"] != 'X'*kmer]
-    
+
     filename = fast5Path.split('/')[-1]
     newPath = getOutfile(filename, options)
     copyfile(fast5Path, newPath)
@@ -107,19 +107,19 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
         stayProb = attrs["num_stays"]/numEvents
         stepProb = 1-skipProb-stayProb
         readLength = attrs["sequence_length"]
-        passQuality = (skipProb < options.constraints['maxSkips'] and 
-                stayProb < options.constraints['maxStays'] and 
+        passQuality = (skipProb < options.constraints['maxSkips'] and
+                stayProb < options.constraints['maxStays'] and
                 stepProb > options.constraints['minSteps'] and
                 readLength >= options.readLength)
-    
+
         analysesGroup = fast5.get("Analyses")
         alignToRefGroup = analysesGroup.create_group("AlignToRef")
-        
+
         # create events
         eventsGroup = alignToRefGroup.create_group(("CurrentSpaceMapped"
                 "_template"))
         eventsGroup.create_dataset("Events", data=events)
-        
+
         # create attrs
         summaryGroup = alignToRefGroup.create_group("Summary")
         attrsGroup = summaryGroup.create_group("current_space_map_template")
@@ -135,26 +135,26 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
         attrs.create("skip_prob", skipProb)
         attrs.create("stay_prob", stayProb)
         attrs.create("step_prob", stepProb)
-        
+
         # create alignment group
         alignGroup = analysesGroup.create_group("Alignment")
         fastaGroup = alignGroup.create_group("Aligned_template")
         fasta = genome[chromosome]['record'].format("fasta")
-        fastaGroup.create_dataset("Fasta", 
+        fastaGroup.create_dataset("Fasta",
                 data=np.array(fasta, dtype='|S{}'.format(len(fasta))))
-        
+
         # create attrs
         summaryGroup = alignGroup.create_group("Summary")
         attrsGroup = summaryGroup.create_group("genome_mapping_template")
         attrs = attrsGroup.attrs
         attrs.create("genome", chromosome)
-        
+
     return passQuality
 
 def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
     """
     Step through eventalign data corresponding to a fast5 file and label events
-    
+
     :param options: Namespace object from argparse
     :param idx: headers index of eventalign file
     :param fast5Path: path to original fast5 file
@@ -165,7 +165,7 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
 
     :returns: two-element array containing basename of fast5 file and boolean indicating read quality
     """
-    
+
     fast5File = fast5Path.split('/')[-1]
     try:
         eventalign = np.load(os.path.join(options.tempDir, fast5File + ".npy"))
@@ -174,7 +174,7 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
         # why on earth?! we just created this file!
         return [fast5File, False]
     skip = False
-    
+
     # open fast5 file
     try:
         fast5 = h5py.File(fast5Path, 'r')
@@ -201,44 +201,44 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
     start=False
     numSkips = 0
     numStays = 0
-    
+
     # check strand direction
     i = 0
     while int(eventalign[0][idx['event_index']]) == int(eventalign[1][idx['event_index']]):
         i += 1
     forward = int(eventalign[i][idx['event_index']]) < int(eventalign[i + 1][idx['event_index']])
-    
+
     for line in eventalign:
-        
+
         current_ref_index = int(line[idx['ref_pos']])
-        
+
         seq_pos_diff = abs(current_ref_index - last_ref_index)
         try:
             seq_pos = last_seq_pos + seq_pos_diff
         except NameError:
             # don't have a last_seq_pos, first event
             seq_pos = 0
-        
+
         seq = getKmer(genome, chromosome, current_ref_index, kmer, forward)
         if options.rate > 0:
         	seq = randomPermuteSeq(seq, alphabet, options.rate)
-        
+
         if last_ref_index == current_ref_index:
             numStays += 1
         elif abs(last_ref_index - current_ref_index) > 1:
-            # count the size of the skip 
+            # count the size of the skip
             # skipping two bases at once counts as two skips
             numSkips += abs(last_ref_index - current_ref_index) - 1
         last_ref_index = current_ref_index
         last_seq_pos = seq_pos
-        
+
         events["seq_pos"][int(line[idx['event_index']])] = seq_pos
         events["kmer"][int(line[idx['event_index']])] = seq
-    
+
     fast5.close()
     try:
-        pass_quality = writeFast5(options, events, fast5Path, initial_ref_index, 
-                last_ref_index, chromosome, forward, numSkips, numStays, 
+        pass_quality = writeFast5(options, events, fast5Path, initial_ref_index,
+                last_ref_index, chromosome, forward, numSkips, numStays,
                 readLength, kmer, genome)
     except Exception as e:
         logging.warning("Failed to save {}.".format(fast5File))
@@ -248,9 +248,9 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
 
 def writeTempFiles(options, eventalign, refs):
     """
-    Write temporary .npy files to split eventalign tsv file into chunks 
+    Write temporary .npy files to split eventalign tsv file into chunks
     corresponding to one fast5 file each - this allows multiprocessing later on.
-    
+
     :param options: Namespace object from argparse
     :param eventalign: String filename of eventalign tsv
     :param refs: dictionary linking read names and fast5 file paths
@@ -262,9 +262,9 @@ def writeTempFiles(options, eventalign, refs):
     """
     if not os.path.exists(options.tempDir):
         os.makedirs(options.tempDir)
-    
+
     with open(eventalign, 'r') as tsv:
-        
+
         # open file
         reader = csv.reader(tsv, delimiter="\t")
         headers = reader.next()
@@ -279,11 +279,11 @@ def writeTempFiles(options, eventalign, refs):
         idx['mean'] = headers.index("event_level_mean")
         idx['stdv'] = headers.index("event_stdv")
         idx['length'] = headers.index("event_length")
-        
+
         line = reader.next()
         kmer=len(line[idx['ref_kmer']])
-        # TODO: can we do this without reopening?    
-    
+        # TODO: can we do this without reopening?
+
     with open(eventalign, 'r') as tsv:
         reader.next() # headers
         current_read_name = ""
@@ -292,9 +292,9 @@ def writeTempFiles(options, eventalign, refs):
         filenames = set()
         premadeFilenames = set()
         n=0
-        
+
         for line in reader:
-            
+
             if skip and line[idx['read_name']] == current_read_name:
                 continue
             elif line[idx['read_name']] != current_read_name:
@@ -308,7 +308,7 @@ def writeTempFiles(options, eventalign, refs):
                 if options.numReads > 0 and n >= options.numReads:
                     # we're done!
                     break
-                
+
                 # new read, initialise
                 tmp = []
                 current_read_name = line[idx['read_name']]
@@ -318,13 +318,13 @@ def writeTempFiles(options, eventalign, refs):
                     skip = True
                     logging.warning(current_read_name + " not found.")
                     continue
-                    
+
                 fast5Name = fast5Path.split('/')[-1]
                 if line[idx['strand']] != 't':
                     # not template, skip
                     skip=True
                     continue
-                
+
                 outfile = getOutfile(fast5Name, options)
                 filename = os.path.join(options.tempDir, fast5Name)
                 if preventOverwrite(outfile, options.force):
@@ -337,18 +337,18 @@ def writeTempFiles(options, eventalign, refs):
                     n += 1
                     filenames.add(fast5Path)
                     continue
-                
+
                 filenames.add(fast5Path)
                 skip=False
-            
+
             tmp.append(line)
-        
+
         # last one gets missed
         # TODO: should we exclude fail reads earlier to save time?
         if tmp is not None and len(tmp) > 0:
             np.save(filename,tmp)
             logging.debug("Saving {}.npy".format(filename))
-        
+
     return filenames, idx, premadeFilenames, kmer
 
 def checkPremade(options, filename):
@@ -357,7 +357,7 @@ def checkPremade(options, filename):
 
     :param options: Namespace object from argparse
     :param filename: Name of premade fast5 file
-    
+
     TODO: remove dependence on options
     """
     try:
@@ -369,8 +369,8 @@ def checkPremade(options, filename):
             stayProb = attrs["num_stays"]/numEvents
             stepProb = 1-skipProb-stayProb
             readLength = attrs["sequence_length"]
-            passQuality = (skipProb < options.constraints['maxSkips'] and 
-                    stayProb < options.constraints['maxStays'] and 
+            passQuality = (skipProb < options.constraints['maxSkips'] and
+                    stayProb < options.constraints['maxStays'] and
                     stepProb > options.constraints['minSteps'] and
                     readLength >= options.readLength)
     except IOError:
@@ -385,15 +385,15 @@ def checkPremade(options, filename):
 def writeTrainfiles(options, trainData, outPrefix):
     """
     Write text files for training and validation consisting of fast5 basenames
-    
+
     Small text files are used for selective training of a smaller dataset.
-    
+
     :param options: Namespace object from argparse
     :param trainData: Dataset consisting or two-element arrays of filename and boolean indicating read quality, where reads marked with True are included in the small dataset
     """
     trainFilename = outPrefix + ".train.txt"
     valFilename = outPrefix + ".val.txt"
-    
+
     with open(trainFilename, 'w') as trainFile, open(valFilename, 'w') as valFile, open(trainFilename + ".small", 'w') as smallTrainFile, open(valFilename + ".small", 'w') as smallValFile:
 
         # write trainFile / valFile headers
@@ -401,7 +401,7 @@ def writeTrainfiles(options, trainData, outPrefix):
         valFile.write("#filename\n")
         smallTrainFile.write("#filename\n")
         smallValFile.write("#filename\n")
-        
+
         for filename, pass_quality in trainData:
             if os.path.isfile(getOutfile(filename, options)):
                 if np.random.rand() > options.valFraction:
@@ -450,36 +450,36 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
     if preventOverwrite(output, options):
         return 1
     makeDir(options.outPrefix)
-    
+
     logging.info("Loading fast5 names and references...")
     refs = loadRef(fasta)
     genome = loadGenome(options, modified)
-    
+
     if "random" in options.selectMode:
         # no point populating constrained files, we will overwrite later
         options.constraints = {'maxSkips' : 0,
-            'maxStays' : 0, 
+            'maxStays' : 0,
             'minSteps' : 1 }
     else:
         logging.info("Calculating skip/stay count constraints...")
-        options.constraints = getSkipStayConstraints(reads, 
+        options.constraints = getSkipStayConstraints(reads,
                 options.dataFraction, options.selectMode, options.readLength)
         logging.debug(str(options.constraints))
-    
+
     logging.info("Splitting eventalign into separate files...")
     filenames, idx, premadeFilenames, kmer = writeTempFiles(options, eventalign, refs)
     pool = Pool(options.threads)
     alphabet = expandAlphabet(options.sequenceMotif)
-    
+
     logging.info("Embedding labels into {} fast5 files...".format(len(filenames)))
-    trainData = pool.map(processReadWrapper, 
+    trainData = pool.map(processReadWrapper,
             [[options, idx, i, genome, modified, kmer, alphabet] for i in filenames])
-    
+
     logging.info("Adding data for {} premade fast5 files...".format(len(premadeFilenames)))
-    trainData.extend(pool.map(checkPremadeWrapper, 
+    trainData.extend(pool.map(checkPremadeWrapper,
             [[options, i] for i in premadeFilenames]))
     pool.close()
     pool.join()
-    
+
     logging.info("Saving datasets for {} total fast5 files...".format(len(trainData)))
     writeTrainfiles(options, trainData, outPrefix)

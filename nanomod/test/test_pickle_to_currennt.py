@@ -37,12 +37,12 @@ def assert_layer_equivalence(l1, l2):
 				assert((l1.lW == l2.lW).all())
 				assert((l1.p == l2.p).all())
 	return 0
-			
+
 def test_numpy_conversion():
 	in_network = np.load(NANONET_NN).item()
 	converted_network = numpy_to_network(in_network)
 	out_network = network_to_numpy(converted_network)
-	
+
 	return assert_network_equivalence(in_network, out_network)
 
 def assert_serial_network(net):
@@ -59,6 +59,6 @@ def test_json_conversion():
 		in_network = json.load(fh)
 	converted_network = network_to_numpy(in_network)
 	out_network = numpy_to_network(converted_network)
-	
+
 	return assert_serial_network(out_network)
 

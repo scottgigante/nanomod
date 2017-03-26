@@ -39,7 +39,7 @@ def indexRead(record, outputDir, options):
         return
     modIndex = dict()
     for i in range(len(record.seq)):
-        if record.seq[i] not in __canonical__: 
+        if record.seq[i] not in __canonical__:
             try:
                 modIndex[record.seq[i]].append(i)
             except KeyError:
@@ -54,17 +54,17 @@ def indexReadWrapper(args):
 def indexAndCleanModifications(fastaFile, options):
     outputDir = "{}.modIndex".format(options.outPrefix)
     makeDir(outputDir)
-    
+
     logging.info("Cleaning fasta of modifications...")
     # TODO: should we avoid overwrite here? would have to reload fasta
     unmodifiedFastaFile = "{}.unmodified.fasta".format(options.outPrefix)
     fasta = unmodifyFasta(fastaFile, unmodifiedFastaFile, options.sequenceMotif)
-    
+
     logging.info("Indexing modifications on reads...")
     p = Pool(options.threads)
     p.map(indexReadWrapper, [[i, outputDir, options] for i in fasta])
-    
-    return unmodifiedFastaFile, outputDir
-    
 
-    
+    return unmodifiedFastaFile, outputDir
+
+
+

@@ -64,15 +64,15 @@ def getSkipStayConstraints(dir, proportion, mode=__modes__, readLength=2000):
         if m not in __modes__:
             logging.warning("Mode {} not recognised")
     files = [os.path.join(dir,file) for file in os.listdir(dir) if file.endswith(".fast5")]
-    
+
     p = Pool()
     probs = np.array(p.map(checkProbs, files)).transpose()
     probs = probs.transpose()[probs[3] >= readLength].transpose()
-    
+
     skipMean, skipStdv = getStats(probs[0])
     stayMean, stayStdv = getStats(probs[1])
     stepMean, stepStdv = getStats(probs[2])
-    
+
     cutoffs = []
     for read in probs.transpose():
         deviations = []
@@ -84,15 +84,15 @@ def getSkipStayConstraints(dir, proportion, mode=__modes__, readLength=2000):
             deviations.append((stepMean - read[2])/stepStdv)
         cutoffs.append(max(deviations))
     cutoffs.sort()
-    numStdvs = cutoffs[int((len(cutoffs)-1)*proportion)] 
+    numStdvs = cutoffs[int((len(cutoffs)-1)*proportion)]
     # want number between 0 and length - 1
-    
+
     maxSkips = skipMean + numStdvs * skipStdv
     maxStays = stayMean + numStdvs * stayStdv
     minSteps = stepMean - numStdvs * stepStdv
-    
+
     return {'maxSkips' : maxSkips if "skip" in mode else 1,
-            'maxStays' : maxStays if "stay" in mode else 1, 
+            'maxStays' : maxStays if "stay" in mode else 1,
             'minSteps' : minSteps if "step" in mode else 0}
 
 if __name__ == "__main__":
