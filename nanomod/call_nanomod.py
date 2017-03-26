@@ -25,9 +25,7 @@
 
 #!/usr/bin/env python
 
-import argparse
 import numpy as np
-from multiprocessing import cpu_count
 import re
 import h5py
 import os
@@ -58,68 +56,12 @@ def parseRegion(region):
             pass
         finally:
             return contig, start, end
-            
-def parseArgs(argv):
-    """parse command line args
-    @args argv sys.argv
-    @return options Namespace object from argparse
-    """
-    
-    #command line options
-    parser = argparse.ArgumentParser(prog="nanomod",
-            description=("Call DNA base modifications, using a pre-trained "
-            "nanomod network. Requires: nanonetcall, bwa."), 
-            epilog=("Example usage: nanomod call --reads " 
-            "sample_data/r9/modified --genome sampla_data/ecoli_k12.fasta "
-            "--model models/5mc.nanomod.npy --output-prefix data/test --threads"
-            " 16"))
-    parser.add_argument("-r","--reads", dest="reads", 
-            required=True, 
-            help=("Directory in which fast5 reads are stored (required)"))
-    parser.add_argument("-g", "--genome", required=True, 
-            dest="genome", help="Reference genome in fasta format (required)")
-    parser.add_argument("-o", "--output-prefix", dest="outPrefix", 
-            required=True, help="Prefix for nanomod output files")
-    parser.add_argument("-m", "--model", 
-            default="models/5mc.nanomod.npy", #required=True,
-            help="Nanomod pre-trained network (required)")
-    parser.add_argument("-s", "--sequence-motif", dest="sequenceMotif",
-            nargs=2, default=["CG","MG"], metavar="CANONICAL MODIFIED",
-            help=("Motif of canonical and modified site (e.g., -s CG MG) "
-            "(required)")) # TODO: include in model?
-    parser.add_argument("-t", "--threads", type=int, default=cpu_count(), 
-            dest="threads", 
-            help="Number of threads to be used in multiprocessing")
-    parser.add_argument("-v","--verbose", default=0, action="count", 
-            dest="verbosity", help=("Can be used multiple times (e.g., -vv) "
-            "for greater levels of verbosity."))
-    parser.add_argument("--region", type=parseRegion, metavar="CHR:START-END",
-            help="Name of contig to analyze")
-    parser.add_argument("--window", type=int, metavar="SIZE", 
-            help="Size of window over which to aggregate calls")
-    parser.add_argument("--chemistry", default="r9") # TODO: can we infer this?
-    parser.add_argument("--num-reads", type=int, default=-1, dest="numReads", 
-            help="Limit the number of reads to be analysed")
-    parser.add_argument("--alpha", default=0.5, type=float, 
-            help="Parameter for uninformative Beta prior")
-    parser.add_argument("--force", default=False, action="store_true", 
-            dest="force", help="Force recreation of extant files")
-    parser.add_argument("--no-normalize", default=False, action="store_true", 
-            dest="noNormalise", 
-            help="do not apply median normalization before run")
-    
-    #parse command line options
-    options = parser.parse_args(argv)
-    configureLog(options.verbosity)
-    
-    return options
 
 # run main script
 # 
 # @args argv sys.argv
 # @return None
-def callNanomod(argv):
-    options = parseArgs(argv)
+def callNanomod(options):
     
     if not options.noNormalise:
         # median normalise

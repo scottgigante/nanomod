@@ -23,52 +23,26 @@
 
 #!/usr/bin/env python
 
-import argparse
-import sys
-
 from train_nanomod import trainNanomod
 from call_nanomod import callNanomod
+from parse_args import parseArgs
 from . import init
-
-def parseArgs():
-    """parse command line args
-    @args argv sys.argv
-    @return options Namespace object from argparse
-    """
-    
-    #command line options
-    parser = argparse.ArgumentParser(prog="nanomod",
-            description=("Nanopore base modification caller."), 
-            epilog=("Commands:\n"
-            "train\tTrain a neural network for a new type of modification\n"
-            "call\tUse an existing trained network to call modifications on a"
-            " set of fast5 files\n\n"
-            "Example usage: nanomod call -r sample_data/r9/modified -m "
-            "models/5mc.nanomod -o data/test.fa"),
-            formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("command", choices=("train","call"))
-    parser.add_argument("options", nargs=argparse.REMAINDER)
-    
-    #parse command line options
-    options = parser.parse_args()
-    
-    return options
 
 # run main script
 # 
 # @args argv sys.argv
 # @return None
 def run():
-    options = parseArgs()
+    command, options = parseArgs()
     # check executables
-    init(options.command)
-    if options.command == "train":
-        trainNanomod(options.options)
-    elif options.command == "call":
-        callNanomod(options.options)
+    init(command)
+    if command == "train":
+        trainNanomod(options)
+    elif command == "call":
+        callNanomod(options)
     else:
         # panic
-        raise argparse.ArgumentError(command, "Command {} not found".format(options.command))
+        raise argparse.ArgumentError(command, "Command {} not found".format(command))
         
 
 if __name__ == "__main__":
