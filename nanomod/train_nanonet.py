@@ -24,7 +24,9 @@
 ################################################################################
 
 from utils import callSubProcess
+import logging
 from . import __exe__
+from seq_tools import expandAlphabet
 
 # main script. Run nanonettrain
 #
@@ -32,10 +34,11 @@ from . import __exe__
 # @return None
 def trainNanonet(options):
     
-    callSubProcess(("{0} --train {1} --train_list {1}.train.txt.small --val {1}"
+    logging.info(("{0} --train {1} --train_list {1}.train.txt.small --val {1}"
                    " --val_list {1}.val.txt.small --output {1} --kmer_length " 
                    "{2} --parallel_sequences {3} --workspace {4} --cache_path "
-                   "{4} --model {5} --cuda").format(__exe__['nanonettrain'], 
+                   "{4} --model {5} --bases {6} --cuda").format(__exe__['nanonettrain'], 
                    options.outPrefix, options.kmer, options.parallelSequences, 
-                   options.tempDir, options.extendedTemplate)
+                   options.tempDir, options.expandedTemplate, "".join(expandAlphabet(options.sequenceMotif))))
+    return None
     # TODO: what should we return
