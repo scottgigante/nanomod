@@ -100,11 +100,11 @@ def combineTrainingSets(options, t1, t2, outPrefix):
     callSubProcess("tail -n +2 {}".format(valFile2), options.force, 
             outputFile=valFileCombined, mode='a')
 
-# run main script
-# 
-# @args argv sys.argv
-# @return None
 def trainNanomod(options):
+    """
+    Run nanomod training
+    :param options: Namespace from argparse
+    """
     try:
         if options.modifiedReads is not None:
             canonicalPrefix = "{}.canonical".format(options.outPrefix)
