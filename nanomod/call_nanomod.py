@@ -78,8 +78,8 @@ def callNanomod(options):
                     raw_group = f["Raw/Reads"].values()[0]
                     signal = raw_group["Signal"][()]
                     med = np.median(signal)
-                    median_deviation = np.array([signal[i] - med for i in range(len(signal))], dtype = "float32")
-                    MAD = 1.0/len(signal) * sum(median_deviation)
+                    median_deviation = signal - med
+                    MAD = np.median(abs(median_deviation))
                     signal = median_deviation / MAD
                     del raw_group["Signal"]
                     raw_group["Signal"] = signal
