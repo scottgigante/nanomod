@@ -36,6 +36,7 @@ __log_levels__ = [logging.WARNING, logging.INFO, logging.DEBUG]
 def configureLog(level=0):
     """
     Set up logging based on user input to verbosity
+    
     :param level: Positive integer, capped at 2
     """
     if level >= len(__log_levels__):
@@ -49,8 +50,10 @@ def configureLog(level=0):
 def preventOverwrite(file, force):
     """
     Check if we are accidentally overwriting something
+    
     :param file: Path to file to be written
     :param force: Boolean value, force overwrite or not
+    
     :returns: Boolean value, prevent overwrite or not
     """
     if file is not None and os.path.isfile(file):
@@ -104,6 +107,7 @@ def callSubProcess(call, force, newFile=None, outputFile=None, close_fds=True,
 def makeDir(dir):
     """
     Create a directory, if it doesn't already exist
+    
     :param dir: The directory to be created
     """
     try:
@@ -115,7 +119,9 @@ def makeDir(dir):
 def loadJson(filename):
     """
     Load a JSON file
+    
     :param filename: string File to be loaded
+    
     :returns: dictionary or array_like JSON output
     """
     with open(filename, 'r') as inFh:
@@ -125,6 +131,7 @@ def loadJson(filename):
 def saveJson(filename, data):
     """
     Save a JSON file
+    
     :param filename: string File to be loaded
     :param data: dictionary or array_like JSON input
     """
@@ -134,8 +141,10 @@ def saveJson(filename, data):
 def multiprocessWrapper(func, args):
     """
     multiprocessing.Pool.map() wrapper for functions taking more than one argument
+    
     :param func: the function to be called
     :param args: an array of arguments for the function
+    
     :returns: return value of called function
     """
     try:

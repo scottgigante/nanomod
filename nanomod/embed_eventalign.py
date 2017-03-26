@@ -41,29 +41,39 @@ from seq_tools import *
 from utils import makeDir, multiprocessWrapper, preventOverwrite
 from check_skip_stay_prob import getSkipStayConstraints
 
-# get the path of the output file corresponding to a fast5 file
-#
-# @args fast5 basename of the fast5 file
-# @args options Namespace object from argparse
-# @return path to output fast5 file
-def getOutfile(fast5, options):
+def getOutfile(fast5, options): 
+    """
+    Get the path of the output file corresponding to a fast5 file.
+
+    :param fast5: Basename of the fast5 file
+    :param options: Namespace object from argparse
+
+    :returns: Relative path to output fast5 file
+    
+    TODO: remove dependence on options
+    """
     return os.path.join(options.outPrefix, fast5)
 
-# write a labelled fast5 file
-#
-# @args options Namespace object from argparse
-# @args events Structured numpy array including event labels
-# @args fast5Path path to original fast5 file
-# @args initial_ref_index starting position of read on reference genome
-# @args last_ref_index ending position of read on reference genome
-# @args chromosome Name of the chromosome to which fast5 is aligned
-# @args forward Boolean value representing forward or reverse read along genome
-# @args numSkips Number of skipped bases on genome
-# @args numStays Number of repeated events without moving along genome
-# @args kmer Length of kmer labels
-# @return String representing whether fast5 file should be train or val data
 def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index, 
         chromosome, forward, numSkips, numStays, readLength, kmer, genome):
+    """
+    Write a labelled fast5 file
+    
+    :param options: Namespace object from argparse
+    :param events: Structured numpy array including event labels
+    :param fast5Path: String relative path to original fast5 file
+    :param initial_ref_index: int starting position of read on reference genome
+    :param last_ref_index: int ending position of read on reference genome
+    :param chromosome: String Name of the chromosome to which fast5 is aligned
+    :param forward: Boolean value, True: forward read, False: reverse read
+    :param numSkips: int number of skipped bases on genome
+    :param numStays: int number of repeated events without moving along genome
+    :param readLength: int length of labelled read
+    :param kmer: int length of kmer labels
+    :param genome: Dictionary containing genome records
+
+    :returns: Boolean, True: high quality read, False: low quality read
+    """
     
     # all events are considered good emissions - bad idea?
     events = append_fields(events, 'good_emission', events["kmer"] != 'X'*kmer)
@@ -74,7 +84,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
     # TODO: we do this twice - make this into a routine.
     # TODO: maybe swap to nanoraw instead of eventalign
     if not options.noNormalize:
-        raw = np.concatenate([np.repeat(events["mean"][i], int(events["length"][i] * 4000))for i in range(events.shape[0])])
+        raw = np.concatenate([np.repeat(events["mean"][i], int(events["length"][i] * 4000)) for i in range(events.shape[0])])
         med = np.median(raw) # TODO: pull sample rate from uniqueglobalkey
         median_abs_deviation = np.median(abs(raw - med))
         events["mean"] = (events["mean"] - med) / median_abs_deviation
@@ -141,15 +151,20 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
         
     return passQuality
 
-# step through eventalign data corresponding to a fast5 file and label events
-#
-# TODO: can we determine kmer length earlier?
-#
-# @args options Namespace object from argparse
-# @args idx headers index of eventalign file
-# @args fast5Path path to original fast5 file
-# @return two-element array containing basename of fast5 file and string reference to either training or validation dataset
 def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
+    """
+    Step through eventalign data corresponding to a fast5 file and label events
+    
+    :param options: Namespace object from argparse
+    :param idx: headers index of eventalign file
+    :param fast5Path: path to original fast5 file
+    :param genome: Dictionary containing genome records
+    :param modified: Boolean value, whether or not this fast5 has modified motif
+    :param kmer: int length of kmer labels
+    :param alphabet: array of base labels in alphabet
+
+    :returns: two-element array containing basename of fast5 file and boolean indicating read quality
+    """
     
     fast5File = fast5Path.split('/')[-1]
     try:
@@ -231,16 +246,20 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
         return [fast5File, False]
     return [fast5File, pass_quality]
 
-# write temporary .npy files to split eventalign tsv file into chunks 
-# corresponding to one fast5 file each - this allows multiprocessing later on
-#
-# @args options Namespace object from argparse
-# @args eventalign filename of eventalign tsv
-# @args refs dictionary linking read names and fast5 file paths
-# @return filenames a list of paths to fast5 files which have been processed
-# @return idx a dictionary linking headers with positions in the tsv
-# @return premadeFilenames a list of basenames of fast5 files which had already been processed prior to this call to Nanomod
 def writeTempFiles(options, eventalign, refs):
+    """
+    Write temporary .npy files to split eventalign tsv file into chunks 
+    corresponding to one fast5 file each - this allows multiprocessing later on.
+    
+    :param options: Namespace object from argparse
+    :param eventalign: String filename of eventalign tsv
+    :param refs: dictionary linking read names and fast5 file paths
+
+    :returns filenames: array_like list of paths to fast5 files which have been processed
+    :returns idx: dictionary linking headers with positions in the tsv
+    :returns premadeFilenames: list of basenames of fast5 files which had already been processed prior to this call to Nanomod
+    :returns kmer: int length of kmer labels
+    """
     if not os.path.exists(options.tempDir):
         os.makedirs(options.tempDir)
     
@@ -332,10 +351,15 @@ def writeTempFiles(options, eventalign, refs):
         
     return filenames, idx, premadeFilenames, kmer
 
-# check quality of premade fast5 files
-# @args options Namespace object from argparse
-# @args filename Name of premade fast5 file
 def checkPremade(options, filename):
+    """
+    Check quality of fast5 files generated in previous runs of nanomod
+
+    :param options: Namespace object from argparse
+    :param filename: Name of premade fast5 file
+    
+    TODO: remove dependence on options
+    """
     try:
         with h5py.File(getOutfile(filename, options), 'r') as fh:
             attrs = fh.get(("Analyses/Basecall_1D_000/Summary/basecall_1d"
@@ -355,19 +379,22 @@ def checkPremade(options, filename):
     except AttributeError:
         # can't find attributes
         logging.info("Attributes missing on {}".format(filename))
-        passQuality = True
+        passQuality = False
     return [filename, passQuality]
 
-# write text files for training and validation consisting of fast5 basenames
-#
-# @args options Namespace object from argparse
-# @args trainData Dataset consisting or two-element arrays of filename and dataset to which file should be added (either "train" or "val")
-# @return None
 def writeTrainfiles(options, trainData, outPrefix):
+    """
+    Write text files for training and validation consisting of fast5 basenames
+    
+    Small text files are used for selective training of a smaller dataset.
+    
+    :param options: Namespace object from argparse
+    :param trainData: Dataset consisting or two-element arrays of filename and boolean indicating read quality, where reads marked with True are included in the small dataset
+    """
     trainFilename = outPrefix + ".train.txt"
     valFilename = outPrefix + ".val.txt"
     
-    with open(trainFilename, 'w') as trainFile, open(valFilename, 'w') as valFile, open(trainFilename + ".small", 'w') as smallTrainFile,    open(valFilename + ".small", 'w') as smallValFile:
+    with open(trainFilename, 'w') as trainFile, open(valFilename, 'w') as valFile, open(trainFilename + ".small", 'w') as smallTrainFile, open(valFilename + ".small", 'w') as smallValFile:
 
         # write trainFile / valFile headers
         trainFile.write("#filename\n")
@@ -389,18 +416,36 @@ def writeTrainfiles(options, trainData, outPrefix):
                         smallValFile.write(filename + "\n")
 
 def processReadWrapper(args):
+    """
+    Multiprocessing wrapper for processRead
+
+    :param args: List of arguments for processRead
+
+    :returns: return value from processRead
+    """
     return multiprocessWrapper(processRead, args)
 
 def checkPremadeWrapper(args):
+    """
+    Multiprocessing wrapper for checkPremade
+
+    :param args: List of arguments for checkPremade
+
+    :returns: return value from checkPremade
+    """
     return multiprocessWrapper(checkPremade, args)
 
-# main script: embed labels to reference genome into fast5 files
-#
-# @args options Namespace object from argparse
-# @args fasta Fasta filename corresponding to reads (MUST be produced by poretools)
-# @args eventalign Filename of eventalign tsv output
-# @return None
 def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
+    """
+    Embed labels from an eventalign run into fast5 files for training by nanonettrain
+
+    :param options: Namespace object from argparse
+    :param fasta: String filename corresponding to fasta file containing reads (MUST be produced by poretools in order to retrieve fasta names)
+    :param eventalign: String filename of eventalign tsv output
+    :param reads: String path to fast5 files
+    :param outPrefix: String prefix for output files
+    :param modified: Boolean value, whether or not reads have modified motif
+    """
     output = "{}.train.txt.small".format(outPrefix)
     if preventOverwrite(output, options):
         return 1
