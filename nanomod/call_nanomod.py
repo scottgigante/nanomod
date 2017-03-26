@@ -90,7 +90,7 @@ def callNanomod(options):
     callSubProcess([__exe__['nanonetcall'], "--chemistry", options.chemistry, 
             "--jobs", str(options.threads), "--model", options.model, 
             "--output",    fastaFile, "--limit", str(options.numReads), "--section", "template", options.reads], 
-            options, shell=False, newFile=fastaFile)
+            options.force, shell=False, newFile=fastaFile)
     # TODO: don't inclide --limit if numReads is -1
     # TODO: fix bases
     
@@ -100,9 +100,9 @@ def callNanomod(options):
     # TODO: we do this twice - separate into a new file?
     callSubProcess(('{} mem -x ont2d -t {} {} {} | samtools view -Sb - '
             '| samtools sort -f - {}').format(__exe__['bwa'], options.threads,
-            options.genome, unmodifiedFastaFile, sortedBamFile), options, 
+            options.genome, unmodifiedFastaFile, sortedBamFile), options.force, 
             outputFile=sortedBamFile, newFile=sortedBamFile)    
-    callSubProcess([__exe__['samtools'], 'index', sortedBamFile], options, 
+    callSubProcess([__exe__['samtools'], 'index', sortedBamFile], options.force, 
             shell=False)
     
     fmt, header, modCounts = countModifications(sortedBamFile, modDir, options)

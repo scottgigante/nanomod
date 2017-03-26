@@ -32,7 +32,7 @@ import sys
 import numpy as np
 
 from seq_tools import unmodifySeq, __canonical__, expandAlphabet
-from utils import loadJson, saveJson, callSubProcess, preventOverwrite
+from utils import loadJson, saveJson, preventOverwrite
 
 
 def generateKmers(inAlpha, outAlpha, kmerLen, sequenceMotif):

@@ -72,7 +72,7 @@ def buildTrainingSet(options, reads, outPrefix, modified=False):
         # overwrite small training sets with random selection
         callSubProcess(("./nanomod/scripts/select_data_fraction.sh {0} "
                 "{1}.train.txt {1}.val.txt").format(options.dataFraction,
-                outPrefix), options)
+                outPrefix), options.force)
 
 def combineTrainingSets(options, t1, t2, outPrefix):
     """
@@ -89,15 +89,15 @@ def combineTrainingSets(options, t1, t2, outPrefix):
     valFile2 = "{}.val.txt.small".format(t2)
     trainFileCombined = "{}.train.txt.small".format(outPrefix)
     valFileCombined = "{}.val.txt.small".format(outPrefix)
-    callSubProcess("cat {}".format(trainFile1), options, 
+    callSubProcess("cat {}".format(trainFile1), options.force, 
             outputFile=trainFileCombined, mode='w')
     # skip header second time
-    callSubProcess("tail -n +2 {}".format(trainFile2), options, 
+    callSubProcess("tail -n +2 {}".format(trainFile2), options.force, 
             outputFile=trainFileCombined, mode='a')
-    callSubProcess("cat {}".format(valFile1), options, 
+    callSubProcess("cat {}".format(valFile1), options.force, 
             outputFile=valFileCombined, mode='w')
     # skip header second time
-    callSubProcess("tail -n +2 {}".format(valFile2), options, 
+    callSubProcess("tail -n +2 {}".format(valFile2), options.force, 
             outputFile=valFileCombined, mode='a')
 
 # run main script

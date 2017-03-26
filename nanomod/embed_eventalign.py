@@ -38,7 +38,7 @@ from multiprocessing import Pool, cpu_count
 from shutil import copyfile
 
 from seq_tools import *
-from utils import callSubProcess, makeDir, multiprocessWrapper, preventOverwrite
+from utils import makeDir, multiprocessWrapper, preventOverwrite
 from check_skip_stay_prob import getSkipStayConstraints
 
 # get the path of the output file corresponding to a fast5 file

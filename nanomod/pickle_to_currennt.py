@@ -31,7 +31,7 @@ import json
 import sys
 import numpy as np
 
-from utils import callSubProcess
+from utils import preventOverwrite
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -224,8 +224,8 @@ def runConvertPickle(in_filename, out_filename):
     return 0
 
 def convertPickle(options):
-    if callSubProcess("touch {}".format(options.currenntTemplate),
-            options, newFile=options.currenntTemplate) == 1:
+    # TODO: don't need to pass options to this function
+    if preventOverwrite(options.currenntTemplate, options.force) == 1:
         return 1
     return runConvertPickle(options.nanonetTemplate, options.currenntTemplate)
     

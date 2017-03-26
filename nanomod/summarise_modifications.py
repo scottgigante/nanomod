@@ -33,7 +33,7 @@ import json
 import numpy as np
 import logging
 
-from utils import callSubProcess, multiprocessWrapper
+from utils import multiprocessWrapper
 from seq_tools import loadGenome, getSeqDiff
 
 def getBayesPercentage(numMods, numUnmods, alpha):
