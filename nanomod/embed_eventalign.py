@@ -74,30 +74,34 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
     # TODO: we do this twice - make this into a routine.
     # TODO: maybe swap to nanoraw instead of eventalign
     if not options.noNormalize:
-        med = np.median(np.concatenate([np.repeat(events["mean"][i], int(events["length"][i] * 4000)) for i in range(events.shape[0])])) # TODO: pull sample rate from uniqueglobalkey
-        median_deviation = [events["mean"][i] - med for i in range(events.shape[0])]
-        MAD = 1/np.sum(events["length"]) * sum(median_deviation[i] * events["length"][i] for i in range(events.shape[0]))
-        events["mean"] = np.array([median_deviation[i] / MAD for i in range(events.shape[0])])
+        raw = np.concatenate([np.repeat(events["mean"][i], int(events["length"][i] * 4000))for i in range(events.shape[0])])
+        med = np.median(raw) # TODO: pull sample rate from uniqueglobalkey
+        median_abs_deviation = np.median(abs(raw - med))
+        events["mean"] = (events["mean"] - med) / median_abs_deviation
+        events["stdv"] = events["stdv"] / median_abs_deviation
     
     # remove unlabelled events 
     # long stretches of unlabelled events severely decrease accuracy
     events = events[events["kmer"] != 'X'*kmer]
-    
-    # TODO: if the read fails QC, should we just move on?
-    numEvents = events.shape[0]
-    skipProb = float(numSkips)/numEvents
-    stayProb = float(numStays)/numEvents
-    stepProb = 1-skipProb-stayProb
-    passQuality = (skipProb < options.constraints['maxSkips'] and 
-            stayProb < options.constraints['maxStays'] and 
-            stepProb > options.constraints['minSteps'] and 
-            readLength >= options.readLength)
     
     filename = fast5Path.split('/')[-1]
     newPath = getOutfile(filename, options)
     copyfile(fast5Path, newPath)
     logging.debug("Saving {}".format(filename))
     with h5py.File(newPath,'r+') as fast5:
+        # TODO: if the read fails QC, should we just move on?
+        attrs = fast5.get(("Analyses/Basecall_1D_000/Summary/basecall_1d"
+                "_template")).attrs
+        numEvents = float(attrs["called_events"])
+        skipProb = attrs["num_skips"]/numEvents
+        stayProb = attrs["num_stays"]/numEvents
+        stepProb = 1-skipProb-stayProb
+        readLength = attrs["sequence_length"]
+        passQuality = (skipProb < options.constraints['maxSkips'] and 
+                stayProb < options.constraints['maxStays'] and 
+                stepProb > options.constraints['minSteps'] and
+                readLength >= options.readLength)
+    
         analysesGroup = fast5.get("Analyses")
         alignToRefGroup = analysesGroup.create_group("AlignToRef")
         
@@ -151,7 +155,7 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
     try:
         eventalign = np.load(os.path.join(options.tempDir, fast5File + ".npy"))
     except IOError:
-        loggoing.warning("Failed to load {}.npy".format(os.path.join(options.tempDir, fast5File)))
+        logging.warning("Failed to load {}.npy".format(os.path.join(options.tempDir, fast5File)))
         # why on earth?!
         return [fast5File, False]
     skip = False
@@ -193,7 +197,10 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
         current_ref_index = int(line[idx['ref_pos']])
         
         if not start:
-            if int(line[idx['event_index']]) > initial_event_index:
+            if int(line[idx['event_index']]) == initial_event_index:
+                # have to skip first event to see what we have
+                continue
+            elif int(line[idx['event_index']]) > initial_event_index:
                 # forward strand
                 forward = True
             else:
@@ -381,12 +388,12 @@ def writeTrainfiles(options, trainData, outPrefix):
         for filename, pass_quality in trainData:
             if os.path.isfile(getOutfile(filename, options)):
                 if np.random.rand() > options.valFraction:
-                    logging.debug("Training set: {}".format(filename))
+                    logging.debug("Training set{}: {}".format(" - Selected" if pass_quality else "", filename))
                     trainFile.write(filename + "\n")
                     if pass_quality:
                         smallTrainFile.write(filename + "\n")
                 else:
-                    logging.debug("Validation set: {}".format(filename))
+                    logging.debug("Validation set{}: {}".format(" - Selected" if pass_quality else "", filename))
                     valFile.write(filename + "\n")
                     if pass_quality:
                         smallValFile.write(filename + "\n")
@@ -436,6 +443,8 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
     logging.info("Adding data for {} premade fast5 files...".format(len(premadeFilenames)))
     trainData.extend(pool.map(checkPremadeWrapper, 
             [[options, i] for i in premadeFilenames]))
+    pool.close()
+    pool.join()
     
     logging.info("Saving datasets for {} total fast5 files...".format(len(trainData)))
     writeTrainfiles(options, trainData, outPrefix)
