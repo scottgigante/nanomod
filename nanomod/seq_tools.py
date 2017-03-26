@@ -29,36 +29,65 @@ from Bio import SeqIO, Seq
 import os
 from copy import copy
 import numpy as np
+import re
 
 __canonical__ = ['A','G','C','T']
-wildcards = { 'W' : ['A', 'T'],
-              'S' : ['C','G'],
-              'M' : ['A','C'],
-              'K' : ['G','T'],
-              'R' : ['A','G'],
-              'Y' : ['C','T'],
-              'B' : ['G','C','T'],
-              'H' : ['A','C','T'],
-              'H' : ['A','G','T'],
-              'V' : ['A','G','C'],
-              'N' : ['A','G','C','T'] }
+__wildcards__ = { 'W' : ['A', 'T'],
+                'S' : ['C','G'],
+                'M' : ['A','C'],
+                'K' : ['G','T'],
+                'R' : ['A','G'],
+                'Y' : ['C','T'],
+                'B' : ['G','C','T'],
+                'H' : ['A','C','T'],
+                'H' : ['A','G','T'],
+                'V' : ['A','G','C'],
+                'N' : ['A','G','C','T'] }
 
-# explode wildcards in sequence motifs
-# @param sequenceMotifs Sequences to be exploded
 def explodeMotifs(sequenceMotifs):
-    # NOT YET IMPLEMENTED
+    """
+    Explode wildcards in sequence motifs
+
+    :param sequenceMotifs: Sequences to be exploded
+
+    :returns: List of sequence motifs, exploded by DNA wildcards
+
+    >>> explodeMotifs(['CCWGG', 'CMWGG'])
+    [['CCAGG', 'CMAGG'], ['CCTGG','CMTGG']]
+
+    NOT YET IMPLEMENTED: how do we deal with multiple sequence motifs???
+
+    TODO: implement wildcard expansion
+    """
     exit(1)
 
 def expandAlphabet(sequenceMotif, alphabet=__canonical__):
+    """
+    Expand nucleotide alphabet based on sequence motif
+
+    :param sequenceMotif: Two element array of strings: canonical motif, modified motif
+    :param alphabet: Canonical DNA alphabet to use as a starting point
+
+    >>> expandAlphabet(["CG", "MG"], ["A","C","G","T"])
+    ["A","C","G","M","T"]
+    """
     expanded = list(alphabet)
     for base in sequenceMotif[1]:
         if base not in expanded:
             expanded.append(base)
-    return expanded
+    return sorted(expanded)
 
 def unmodifyFasta(inFile, outFile, sequenceMotif):
-    """Load a fasta file and clean it of base modifications, returning the
-    original fasta as an array of records."""
+    """
+    Load a fasta file and clean it of base modifications, returning the
+    original fasta as an array of records.
+
+    :param inFile: String path to original fasta file
+    :param outFile: String path to output fasta file
+    :param sequenceMotif: Two-element array of strings, canonical motif, modified motif to clean
+
+    :returns: list of records in original fasta file
+    """
     fasta = []
     with open(inFile, "rU") as inHandle, open(outFile, "w") as outHandle:
         for record in SeqIO.parse(inHandle, "fasta"):
@@ -69,11 +98,14 @@ def unmodifyFasta(inFile, outFile, sequenceMotif):
             SeqIO.write(unmodifiedRecord, outHandle, "fasta")
     return fasta
 
-# create a dictionary linking read names to fast5 file paths
-#
-# @args fasta Filename of the fasta file created by poretools
-# @return Dictionary linking read names to fast5 file paths
 def loadRef(fasta):
+    """
+    Create a dictionary linking read names to fast5 file paths
+
+    :param fasta: Filename of the fasta file created by poretools
+
+    :returns: Dictionary linking read names to fast5 file paths
+    """
     refs = dict()
     readsPath = '/'.join(fasta.split('/')[:-1])
     handle = open(fasta, "rU")
@@ -84,11 +116,17 @@ def loadRef(fasta):
     handle.close()
     return refs
 
-# load the reference genome
-#
-# @args filename Fasta filename of reference genome
-# @return dictionary of SeqIO records corresponding to each contig of reference
 def loadGenome(options, modified=False):
+    """
+    Load a reference genome and store modified and reversed copies
+
+    :param options: Namespace object from argparse
+    :param modified: Boolean, whether or not the sequence is modified
+
+    :returns: dictionary of dictionaries, each of which contains a SeqIO record, forward (perhaps modified) sequence and reversed sequence corresponding to each contig of reference
+
+    TODO: remove dependence on options
+    """
     genome = {}
     with open(options.genome, "rU") as handle:
         for record in SeqIO.parse(handle, "fasta"):
@@ -96,22 +134,26 @@ def loadGenome(options, modified=False):
             reverseSeq = Seq.reverse_complement(record.seq)
             Seq.reverse_complement(reverseSeq)
             if modified:
-                record.seq = modifySeq(options, record.seq)
-                reverseSeq = modifySeq(options, reverseSeq)
+                record.seq = modifySeq(record.seq, options.sequenceMotif)
+                reverseSeq = modifySeq(reverseSeq, options.sequenceMotif)
             contig['seq'] = record.seq
             contig['reverseSeq'] = reverseSeq
             contig['record'] = record
             genome[record.id] = contig
     return genome
 
-# get the kmer at a particular place in the genome
-# @param genome the genome dictionary from loadGenome
-# @param chromosome Contig id
-# @param pos Position on forward reference
-# @param kmer Kmer length
-# @param forward Boolean marker of forward or reverse read
-# @return Kmer as a string
 def getKmer(genome, chromosome, pos, kmer, forward):
+    """
+    Get the kmer at a particular place in the genome.
+
+    :param genome: the genome dictionary from loadGenome
+    :param chromosome: string Contig id
+    :param pos: int Position on forward reference
+    :param kmer: int Kmer length
+    :param forward: Boolean marker of forward or reverse read
+
+    :returns: Desired kmer as a string
+    """
     stop_pos = pos + kmer
     if forward:
         seq = genome[chromosome]['seq']
@@ -122,19 +164,35 @@ def getKmer(genome, chromosome, pos, kmer, forward):
         stop_pos = -pos
     return str(seq[start_pos:stop_pos])
 
-def randomPermuteSeq(seq, alphabet, rate):
-	for i in range(len(seq)):
-		if np.random.rand() < rate:
-			seq = list(seq)
-			seq[i] = alphabet[np.random.randint(len(alphabet))]
-			seq = "".join(seq)
-	return seq
+def randomPermuteSeq(seq, alphabet=__canonical__, rate=0.001):
+    """
+    Randomly permute bases in a sequence to add noise and decrease overfitting.
 
-# apply base modification to a sequence
-#
-# @args seq The sequence to be modified
-# @return The modified sequence
-def modifySeq(options, seq):
+    :param seq: string Sequence to be permuted
+    :param alphabet: list of characters Alphabet to be drawn from
+    :param rate: float Rate at which to randomly permute
+
+    :returns: string The modified sequence
+    """
+    for i in range(len(seq)):
+        if np.random.rand() < rate:
+            seq = list(seq)
+            seq[i] = alphabet[np.random.randint(len(alphabet))]
+            seq = "".join(seq)
+    return seq
+
+def modifySeq(seq, sequenceMotif):
+    """
+    Apply base modification to a sequence
+
+    :param seq: string The sequence to be modified
+    :param sequenceMotif: Two-element array of strings: canonical motif, modified motif
+
+    :returns: string The modified sequence
+
+    >>> modifySeq("CAGCGT", ["CG", "MG"])
+    "CAGMGT"
+    """
     # TODO: we do this twice - make it a method?
     if type(seq) == Seq.Seq:
         returnBioSeq = True
@@ -142,24 +200,23 @@ def modifySeq(options, seq):
     else:
         returnBioSeq = False
 
-    seq = seq.replace(options.sequenceMotif[0],options.sequenceMotif[1])
+    seq = seq.replace(sequenceMotif[0],sequenceMotif[1])
     return Seq.Seq(seq) if returnBioSeq else seq
 
-# replace a pattern only if at the start of a string
-# http://code.activestate.com/recipes/577252-lreplace-and-rreplace-replace-the-beginning-and-en/
-def lreplace(pattern, sub, string):
-    return sub + string[len(pattern):] if string.startswith(pattern) else string
-
-# replace a pattern only if at the end of a string
-def rreplace(pattern, sub, string):
-    return string[:-len(pattern)] + sub if string.endswith(pattern) else string
-
-# undo base modification to a sequence
-# assume positive site recognition at either end if possible
-#
-# @args seq The sequence to be unmodified
-# @return The unmodified sequence
 def unmodifySeq(seq, sequenceMotif):
+    """
+    Undo base modification to a sequence
+    Assume positive site recognition at either end if possible
+
+
+    :param seq: string The sequence to be unmodified
+    :param sequenceMotif: Two-element array of strings: canonical motif, modified motif
+
+    :returns: string The unmodified sequence
+
+    >>> unmodifySeq("CAGMGM", ["CG", "MG"])
+    "CAGCGC"
+    """
     if type(seq) == Seq.Seq:
         returnBioSeq = True
         seq = str(seq)
@@ -170,12 +227,23 @@ def unmodifySeq(seq, sequenceMotif):
     pattern = sequenceMotif[1]
     sub = sequenceMotif[0]
     for i in range(1, len(pattern)):
-        seq = lreplace(pattern[i:], sub[i:], seq)
-        seq = rreplace(pattern[:i], sub[:i], seq)
+        seq = re.sub("^" + pattern[i:], sub[i:], seq)
+        seq = re.sub(pattern[:i] + "$", sub[:i], seq)
     # now replace in the middle
     seq = seq.replace(pattern,sub)
     return Seq.Seq(seq) if returnBioSeq else seq
 
 def getSeqDiff(s1, s2):
-    """Get all positions where two sequences differ"""
+    """
+    Get all positions where two sequences differ for sequences of equal length
+
+    :param s1: string Sequence to be compared
+    :param s2: string Another sequence to be compared
+
+    :raises IndexError: if sequences are not the same length
+
+    :returns: list of integer positions where sequences differ
+    """
+    if len(s1) != len(s2):
+        raise IndexError("Sequences must be of same length")
     return [i for i in xrange(len(s1)) if s1[i] != s2[i]]

@@ -34,8 +34,21 @@ import numpy as np
 from seq_tools import unmodifySeq, __canonical__, expandAlphabet
 from utils import loadJson, saveJson, preventOverwrite
 
-
 def generateKmers(inAlpha, outAlpha, kmerLen, sequenceMotif):
+    """
+    Generate a list of kmers for the expanded alphabet, and a map from the modified kmers
+    to their corresponding unmodified kmers, when there are any.
+
+    :param inAlpha: List of characters, original alphabet
+    :param outAlpha: List of characters, new alphabet
+    :param kmerLen: int length of kmers
+    :param sequenceMotif: two element array, canonical motif, modified motif
+
+    :returns outKmers: array of strings, all kmers in new model
+    :returns reverseMap: dictionary linking new kmer indices to original kmer strings where they exist, and None otherwise
+
+    TODO: should we randomly initialise (rather than zero) for nonexistent kmers?
+    """
     badKmer = 'X'*kmerLen
 
     # generate original kmers
@@ -60,6 +73,16 @@ def generateKmers(inAlpha, outAlpha, kmerLen, sequenceMotif):
     return outKmers, reverseMap
 
 def createExpandedNetwork(inNetwork, kmers, reverseMap):
+    """
+    Generate an expanded network dictionary based on a pre-existing network and a list of
+    new kmers.
+
+    :param inNetwork: Dictionary Pre-existing network
+    :param kmers: list of strings, all possible kmers in new model
+    :param reverseMap: dictionary linking new kmer indices to original kmer strings where they exist, and None otherwise
+
+    :returns: Dictionary new network with expanded alphabet
+    """
     outNetwork = copy.deepcopy(inNetwork)
 
     # expand softmax output and multiclass postoutput layer
@@ -88,13 +111,20 @@ def createExpandedNetwork(inNetwork, kmers, reverseMap):
 
     return outNetwork
 
-def run(inFilename, outFilename, kmer, sequenceMotif, options=None):
-    try:
-        if preventOverwrite(outFilename, options):
-            return 1
-    except AttributeError:
-        # running as standalone, no such thing as options
-        pass
+def run(inFilename, outFilename, kmer, sequenceMotif, force=True):
+    """
+    Expand nanonet model file to include all possible outputs from an expanded model
+
+    :param inFilename: String path to nanonet trained network JSON file
+    :param outFilename: String path to output JSON file
+    :param kmer: int kmer length (must match network kmer length
+    :param sequenceMotif: two element array of strings, canonical motif, modified motif
+    :param force: Boolean value, force creation of extant file or not
+
+    # TODO: can we infer kmer length?
+    """
+    if preventOverwrite(outFilename, force):
+        return 1
     inNetwork = loadJson(inFilename)
     alphabet = expandAlphabet(sequenceMotif, __canonical__)
     kmers, reverseMap = generateKmers(__canonical__, alphabet, kmer,
@@ -103,9 +133,20 @@ def run(inFilename, outFilename, kmer, sequenceMotif, options=None):
     saveJson(outFilename, outNetwork)
 
 def expandModelAlphabet(options):
+    """
+    Expand nanonet model file to include all possible outputs from an expanded model
+
+    :param options: Namespace object from argparse
+    """
     run(options.currenntTemplate, options.expandedTemplate, options.kmer,
-            options.sequenceMotif, options)
+            options.sequenceMotif, options.force)
 
 if __name__ == "__main__":
+    """
+    Command line interface.
+
+    Usage: python expand_model_alphabet.py in_network.json out_network.json <kmer_length>
+    <canonical_motif> <modified_motif>
+    """
     args = sys.argv
     run(args[1], args[2], int(args[3]), [args[4], args[5]])

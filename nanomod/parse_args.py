@@ -57,12 +57,14 @@ __epilog__ = {
                 16"""
     }
 
-# create directories, move things to the right place, etc
-#
-# @args options Namespace object from argparse
-# @return None
 def initialiseTrainArgs(options):
+    """
+    Perform various initalisation tasks for training.
 
+    :param options: Namespace object from argparse
+
+    :returns: Namespace object from argparse
+    """
     # make the temp dir
     makeDir(options.tempDir)
     options.tempDir = os.path.join(options.tempDir,
@@ -102,10 +104,35 @@ def initialiseTrainArgs(options):
     options.expandedTemplate = "{}.mod.json".format(options.nanonetTemplate)
     expandModelAlphabet(options)
 
+def initialiseArgs(command, options):
+    """
+    Perform various initalisation tasks.
+
+    :param command: String The nanomod command to be executed
+    :param options: Namespace object from argparse
+
+    :returns: Namespace object from argparse
+    """
+    # sequence motif should all be uppercase
+    options.sequenceMotif = [s.upper() for s in sequenceMotif]
+
+    if command == "train":
+        initialiseTrainArgs(options)
+    elif command == "call":
+        # currently no call specific initialisation
+        pass
+    else:
+        # this shouldn't ever happen
+        raise NameError("{} command not defined".format(command))
+
+    return options
+
 def addCommonArgs(parser):
     """
     Add arguments common to all running modes
+
     :param parser: The argument parser to be modified
+
     :returns: The modified argument parser
     """
     parser.add_argument("-g", "--genome", required=True,
@@ -134,10 +161,11 @@ def addCommonArgs(parser):
 def addCallArgs(parser):
     """
     Add arguments unique to nanomod call
+
     :param parser: The argument parser to be modified
+
     :returns: The modified argument parser
     """
-
     #command line options
     parser.add_argument("-r","--reads", dest="reads",
             required=True,
@@ -158,10 +186,11 @@ def addCallArgs(parser):
 def addTrainArgs(parser):
     """
     Add arguments unique to nanomod train
+
     :param parser: The argument parser to be modified
+
     :returns: The modified argument parser
     """
-
     parser.add_argument("-c","--canonical-reads", dest="canonicalReads",
             required=True,
             help=("Directory in which canonical-base fast5 reads are stored "
@@ -206,7 +235,6 @@ def parseCommandArgs(command, argv):
     :raises NameError: raises error if a nonexistent command is called
     :returns: Namespace object from argparse
     """
-
     parser = argparse.ArgumentParser(prog="nanomod",
             description=(__decription__[command]),
             epilog=__epilog__[command])
@@ -222,19 +250,19 @@ def parseCommandArgs(command, argv):
     configureLog(options.verbosity)
     logging.debug("nanomod {} {}".format(command, " ".join(argv)))
 
-    if command == "train":
-        initialiseTrainArgs(options)
+    initialiseArgs(command, options)
 
     return options
 
 def parseArgs():
     """
     Parse Nanomod command line arguments
+
     :raises argparse.ArgumentError: raises error if a nonexistent command is called
+
     :returns command: Nanomod command to be called
     :returns options: argparse namespace for command line arguments
     """
-
     #command line options
     parser = argparse.ArgumentParser(prog="nanomod",
             description=("Nanopore base modification caller."),
