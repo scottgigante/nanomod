@@ -5,9 +5,8 @@ python:
 sudo: required
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get install -y libhdf5-serial-dev python-numpy
-  - pip install --upgrade numpy
-  - git clone https://github.com/nanoporetech/nanonet
+  - sudo apt-get install -y libhdf5-serial-dev
+  - git clone -b travis https://github.com/scottgigante/nanonet
   - cd nanonet
   - sudo python setup.py install
   - cd ..
