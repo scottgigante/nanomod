@@ -75,7 +75,7 @@ def parseRegion(region):
         finally:
             return contig, start, end
 
-def normaliseReads(reads):
+def normalizeReads(reads):
     """
     Normalise raw signal using median normalization
 
@@ -112,9 +112,9 @@ def callNanomod(options):
     :param options: Namespace object from argparse
     """
 
-    if not options.noNormalise:
+    if not options.noNormalize:
         # median normalise raw signal
-        options.reads = normaliseReads(options.reads)
+        options.reads = normalizeReads(options.reads)
 
     fastaFile = "{}.fasta".format(options.outPrefix)
     args = [__exe__['nanonetcall'], "--chemistry", options.chemistry,
@@ -126,7 +126,7 @@ def callNanomod(options):
 
     unmodifiedFastaFile, modDir = indexAndCleanModifications(fastaFile, options)
 
-    sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, options.force)
+    sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, options.outPrefix, options.force)
 
     fmt, header, modCounts = countModifications(sortedBamFile, modDir, options)
     #wig = getWiggleTrack(modificationCounts)

@@ -103,7 +103,7 @@ def multithreadPoretools(poretools, tempDir, force, reads, output, filesPerCall=
                 for line in infile:
                     outfile.write(line)
 
-def buildSortedBam(threads, genome, fastaFile, force):
+def buildSortedBam(threads, genome, fastaFile, outPrefix, force):
     """
     Build an indexed sorted bam from a fasta file.
 
@@ -160,7 +160,7 @@ def buildEventalign(options, reads, outPrefix):
             options.force, newFile="{}.bwt".format(options.genome))
 
     # build sorted bam file using bwa mem
-    sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, options.force)
+    sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, outPrefix, options.force)
 
     # run nanopolish eventalign
     eventalignFile = "{}.eventalign".format(outPrefix)
