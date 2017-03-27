@@ -36,6 +36,8 @@ import shutil
 import logging
 
 from utils import makeDir, configureLog
+from pickle_to_currennt import convertPickle
+from expand_model_alphabet import expandModelAlphabet
 from . import __modes__
 
 __description__ = {
@@ -114,7 +116,7 @@ def initialiseArgs(command, options):
     :returns: Namespace object from argparse
     """
     # sequence motif should all be uppercase
-    options.sequenceMotif = [s.upper() for s in sequenceMotif]
+    options.sequenceMotif = [s.upper() for s in options.sequenceMotif]
 
     if command == "train":
         initialiseTrainArgs(options)
@@ -151,7 +153,7 @@ def addCommonArgs(parser):
     parser.add_argument("--force", default=False, action="store_true",
             dest="force", help="Force recreation of extant files") # TODO: make this ranked? eg force 1, force 8?
     parser.add_argument("--no-normalize", default=False, action="store_true",
-            dest="noNormalise",
+            dest="noNormalize",
             help="do not apply median normalization before run") # TODO: can we infer this?
     parser.add_argument("-t", "--threads", type=int, default=cpu_count(),
             dest="threads",
@@ -236,7 +238,7 @@ def parseCommandArgs(command, argv):
     :returns: Namespace object from argparse
     """
     parser = argparse.ArgumentParser(prog="nanomod",
-            description=(__decription__[command]),
+            description=(__description__[command]),
             epilog=__epilog__[command])
     parser = addCommonArgs(parser)
     if command == "call":
@@ -282,6 +284,6 @@ def parseArgs():
     try:
         options = parseCommandArgs(initialOptions.command, initialOptions.options)
     except NameError:
-        raise argparse.ArgumentError(command, "Command {} not found".format(initialOptions.command))
+        raise argparse.ArgumentError(initialOptions.command, "Command {} not found".format(initialOptions.command))
 
     return initialOptions.command, options
