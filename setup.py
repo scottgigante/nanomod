@@ -1,5 +1,5 @@
 import os
-from setuptools import setup, find_packages
+from setuptools import setup
 
 version_py = os.path.join(os.path.dirname(__file__), 'nanomod', '__init__.py')
 version = open(version_py).read().strip().split('=')[-1].replace('"','').strip()
@@ -14,7 +14,7 @@ def read(fname):
 
 setup(
   name = 'nanomod',
-  packages = find_packages(),
+  packages = ['nanomod'],
   package_dir={'nanomod': "nanomod"},
   version=version,
   install_requires=['numpy>=1.7', 'h5py>2.2.0', 'biopython', 'pysam',],
