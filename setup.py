@@ -26,11 +26,11 @@ setup(
   url = 'https://github.com/scottgigante/nanomod', # use the URL to the github repo
   keywords = ['nanopore', 'methylation', 'epigenomics', 'hdf5', 'fast5', 'oxford', 'minion', 'basecalling'], # arbitrary keywords
   classifiers = [
-		"Development Status :: 3 - Alpha",
-		'Intended Audience :: Science/Research',
-		'License :: OSI Approved :: GNU General Public License (GPL)',
-		'Topic :: Scientific/Engineering :: Bio-Informatics'
-		],
+        "Development Status :: 3 - Alpha",
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: GNU General Public License (GPL)',
+        'Topic :: Scientific/Engineering :: Bio-Informatics'
+        ],
   entry_points = {
         'console_scripts': ['nanomod = nanomod.__main__:run'],
     },
