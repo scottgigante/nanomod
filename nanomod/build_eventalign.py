@@ -139,15 +139,17 @@ def buildEventalign(options, reads, outPrefix):
 
     fastaFile = '{}.fasta'.format(outPrefix)
     # build fasta using poretools so we have index to fast5 files
-    if False:
-        # GNU parallel
-        callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X {} fasta '
-                '--type fwd {}').format(reads,
-                __exe__['poretools'],"{}"), options.force, newFile=fastaFile,
-                outputFile=fastaFile)
-    elif True:
-        # custom multiprocessing script
-        multithreadPoretools(__exe__['poretools'], options.tempDir, options.force, reads, fastaFile)
+    if True:
+        try:
+            # GNU parallel
+            callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X {} fasta '
+                    '--type fwd {}').format(reads,
+                    __exe__['poretools'],"{}"), options.force, newFile=fastaFile,
+                    outputFile=fastaFile)
+        except Exception:
+            # something went wrong - are we missing paralle?
+            # use our custom multiprocessing script
+            multithreadPoretools(__exe__['poretools'], options.tempDir, options.force, reads, fastaFile)
     else:
         # single threaded poretools - slow
         callSubProcess(('{} fasta --type fwd {}').format(__exe__['poretools'],
