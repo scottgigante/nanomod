@@ -35,8 +35,6 @@ import shutil
 from utils import callSubProcess
 from build_eventalign import buildEventalign
 from embed_eventalign import embedEventalign
-from pickle_to_currennt import convertPickle
-from expand_model_alphabet import expandModelAlphabet
 from train_nanonet import trainNanonet
 
 def clean(options):
