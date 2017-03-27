@@ -1,7 +1,7 @@
 import os
 from setuptools import setup
 
-version_py = os.path.join(os.path.dirname(__file__), 'nanomod', '__init__.py')
+version_py = os.path.join(os.path.dirname(__file__), 'nanomod', 'version.py')
 version = open(version_py).read().strip().split('=')[-1].replace('"','').strip()
 print version
 
