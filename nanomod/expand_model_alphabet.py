@@ -166,7 +166,7 @@ def getInKmerLen(inNetwork, alphabet=__canonical__):
 
     return kmerLen
 
-def run(inFilename, outFilename, outKmerLen, sequenceMotif, force=True):
+def run(inFilename, outFilename, outKmerLen, sequenceMotif=["",""], force=True):
     """
     Expand nanonet model file to include all possible outputs from an expanded model
 
@@ -205,4 +205,8 @@ if __name__ == "__main__":
     <canonical_motif> <modified_motif>
     """
     args = sys.argv
-    run(args[1], args[2], int(args[3]), [args[4], args[5]])
+    try:
+        run(args[1], args[2], int(args[3]), [args[4], args[5]])
+    except IndexError:
+        # no sequence motif specified
+        run(args[1], args[2], int(args[3]))
