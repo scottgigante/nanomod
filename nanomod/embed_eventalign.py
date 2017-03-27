@@ -285,6 +285,7 @@ def writeTempFiles(options, eventalign, refs):
         # TODO: can we do this without reopening?
 
     with open(eventalign, 'r') as tsv:
+        reader = csv.reader(tsv, delimiter="\t")
         reader.next() # headers
         current_read_name = ""
         skip=True
