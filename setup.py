@@ -1,5 +1,5 @@
 import os
-from setuptools import setup, find_packages()
+from setuptools import setup, find_packages
 
 version_py = os.path.join(os.path.dirname(__file__), 'nanomod', '__init__.py')
 version = open(version_py).read().strip().split('=')[-1].replace('"','').strip()
