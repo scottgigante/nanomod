@@ -26,13 +26,35 @@
 ################################################################################
 
 import json
-from nanonet.util import all_kmers
 import copy
 import sys
 import numpy as np
 
 from seq_tools import unmodifySeq, __canonical__, expandAlphabet
 from utils import loadJson, saveJson, preventOverwrite
+
+def all_kmers(alphabet='ACGT', length=5, rev_map=False):
+    """ Find all possible kmers of given length.
+
+    .. Warning::
+       The return value type of this function is dependent on the input
+       arguments
+
+    From https://github.com/nanoporetech/nanonet. Licenced under MPL 2.0.
+
+    :param alphabet: string from which to draw characters
+    :param length: length of kmers required
+    :param rev_map: return also a dictionary containing the reverse mapping i.e. {'AAA':0, 'AAC':1}
+
+    :returns: a list of strings. kmers are sorted by the ordering of the *alphabet*. If *rev_map*
+        is specified a second item is returned as noted above.
+
+    """
+    fwd_map = map(lambda x: ''.join(x), product(alphabet, repeat=length))
+    if not rev_map:
+        return fwd_map
+    else:
+        return fwd_map, dict(zip(fwd_map, xrange(len(fwd_map))))
 
 def generateKmers(inAlpha, outAlpha, inKmerLen, outKmerLen, sequenceMotif):
     """
