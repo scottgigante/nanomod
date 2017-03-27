@@ -34,14 +34,15 @@ import numpy as np
 from seq_tools import unmodifySeq, __canonical__, expandAlphabet
 from utils import loadJson, saveJson, preventOverwrite
 
-def generateKmers(inAlpha, outAlpha, kmerLen, sequenceMotif):
+def generateKmers(inAlpha, outAlpha, inKmerLen, outKmerLen, sequenceMotif):
     """
     Generate a list of kmers for the expanded alphabet, and a map from the modified kmers
     to their corresponding unmodified kmers, when there are any.
 
     :param inAlpha: List of characters, original alphabet
     :param outAlpha: List of characters, new alphabet
-    :param kmerLen: int length of kmers
+    :param inKmerLen: int length of kmers in input model
+    :param outKmerLen: int length of kmers in output model
     :param sequenceMotif: two element array, canonical motif, modified motif
 
     :returns outKmers: array of strings, all kmers in new model
@@ -49,27 +50,41 @@ def generateKmers(inAlpha, outAlpha, kmerLen, sequenceMotif):
 
     TODO: should we randomly initialise (rather than zero) for nonexistent kmers?
     """
-    badKmer = 'X'*kmerLen
 
     # generate original kmers
-    inKmers = all_kmers("".join(inAlpha), kmerLen)
-    inKmers.append(badKmer)
+    inKmers = all_kmers("".join(inAlpha), inKmerLen)
+    inKmers.append('X'*inKmerLen)
     # create map of kmer to index in inKmers
     inKmersMap = {k:i for i,k in enumerate(inKmers)}
     # generate modified kmers
-    outKmers = all_kmers("".join(outAlpha), kmerLen)
-    outKmers.append(badKmer)
+    outKmers = all_kmers("".join(outAlpha), outKmerLen)
+    outKmers.append('X'*outKmerLen)
 
     # map each methylated kmer to its non-methylated equivalent
     reverseMap = dict()
-    for i in range(len(outKmers)):
-        k = unmodifySeq(outKmers[i], sequenceMotif)
-        if inKmersMap.has_key(k):
-            reverseMap[i] = inKmersMap[k]
+    if inKmerLen > outKmerLen:
+        if inKmerLen % 2 == 0:
+            start = (inKmerLen - outKmerLen) / 2
+            end = -((inKmerLen - outKmerLen) / 2) - (inKmerLen - outKmerLen) % 2
         else:
-            # kmer doesn't exist
-            #reverseMap[i] = np.random.randint(len(inKmers))
-            reverseMap[i] = None
+            start = (inKmerLen - outKmerLen) / 2 + (inKmerLen - outKmerLen) % 2
+            end = -((inKmerLen - outKmerLen) / 2)
+        if end == 0:
+            end = inKmerLen
+        for i in range(len(outKmers)):
+            k = unmodifySeq(outKmers[i], sequenceMotif)
+            reverseMap[i] = []
+            for inKmer in inKmersMap.keys():
+                if inKmer[start:end] == k:
+                    reverseMap[i].append(inKmersMap[inKmer])
+    elif inKmerLen < outKmerLen:
+        raise ValueError("Cannot build model with longer kmers than input model")
+    else:
+        for i in range(len(outKmers)):
+            k = unmodifySeq(outKmers[i], sequenceMotif)
+            reverseMap[i] = []
+            if inKmersMap.has_key(k):
+                reverseMap[i].append(inKmersMap[k])
     return outKmers, reverseMap
 
 def createExpandedNetwork(inNetwork, kmers, reverseMap):
@@ -96,38 +111,77 @@ def createExpandedNetwork(inNetwork, kmers, reverseMap):
     outNetwork['weights'][outputLayer]['input'] = [0] * inputSize
     for i in range(outNetwork['layers'][-3]['size']):
         for j in range(len(kmers)):
-            if reverseMap[j] is not None:
-                inIdx = i * inNetwork['layers'][-3]['size'] + reverseMap[j]
-                outIdx = i * outNetwork['layers'][-3]['size'] + j
-                outNetwork['weights'][outputLayer]['input'][outIdx] = \
-                        inNetwork['weights'][outputLayer]['input'][inIdx]
+            if len(reverseMap[j]) > 0:
+                outIdx = i * len(kmers) + j
+                for mapping in reverseMap[j]:
+                    inIdx = i * inNetwork['layers'][-3]['size'] + mapping
+                    outNetwork['weights'][outputLayer]['input'][outIdx] += \
+                            inNetwork['weights'][outputLayer]['input'][inIdx]
+                outNetwork['weights'][outputLayer]['input'][outIdx] = outNetwork['weights'][outputLayer]['input'][outIdx] / len(reverseMap[j])
 
     biasSize = len(kmers)
     outNetwork['weights'][outputLayer]['bias'] = [0] * biasSize
     for i in range(biasSize):
-        if reverseMap[i] is not None:
-            outNetwork['weights'][outputLayer]['bias'][i] = \
-                    inNetwork['weights'][outputLayer]['bias'][reverseMap[i]]
+        if len(reverseMap[i]) > 0:
+            for mapping in reverseMap[i]:
+                outNetwork['weights'][outputLayer]['bias'][i] += \
+                    inNetwork['weights'][outputLayer]['bias'][mapping]
+            outNetwork['weights'][outputLayer]['bias'][i] = outNetwork['weights'][outputLayer]['bias'][i] / len(reverseMap[i])
 
     return outNetwork
 
-def run(inFilename, outFilename, kmer, sequenceMotif, force=True):
+def integer_nth_root(val, n):
+    """
+    Custom integer nth root script since rounding errors make the expected val**(1.0/n)
+    fail some of the time.
+
+    :param val: int Value to be nth rooted
+    :param n: int nth root
+
+    :raises TypeError: if val or n are not integers
+
+    :returns: int nth root of val
+    """
+    if not (int(val) == val and int(n) == n):
+        raise TypeError("Integer nth root supports integer values only")
+    ret = int(val**(1./n))
+    return ret + 1 if (ret + 1) ** n == val else ret
+
+def getInKmerLen(inNetwork, alphabet=__canonical__):
+    """
+    Check kmer length used in original model by inferring from number of output units
+
+    :param inNetwork: Dictionary Pre-existing network
+    :param alphabet: list of characters DNA alphabet used in network
+
+    :returns: int Length of kmers in pre-existing network.
+    """
+    numOutputs = inNetwork['layers'][-2]['size']
+
+    # one of them is badKmer
+    numOutputs = numOutputs - 1
+
+    # kmerLen^len(alphabet) == numOutputs
+    kmerLen = integer_nth_root(numOutputs, len(alphabet))
+
+    return kmerLen
+
+def run(inFilename, outFilename, outKmerLen, sequenceMotif, force=True):
     """
     Expand nanonet model file to include all possible outputs from an expanded model
 
     :param inFilename: String path to nanonet trained network JSON file
     :param outFilename: String path to output JSON file
-    :param kmer: int kmer length (must match network kmer length
+    :param outKmerLen: int kmer length for output network (must be <= network kmer length)
     :param sequenceMotif: two element array of strings, canonical motif, modified motif
     :param force: Boolean value, force creation of extant file or not
-
-    # TODO: can we infer kmer length?
     """
     if preventOverwrite(outFilename, force):
         return 1
     inNetwork = loadJson(inFilename)
+    inKmerLen = getInKmerLen(inNetwork)
     alphabet = expandAlphabet(sequenceMotif, __canonical__)
-    kmers, reverseMap = generateKmers(__canonical__, alphabet, kmer,
+    kmers, reverseMap = generateKmers(__canonical__, alphabet, inKmerLen, outKmerLen,
             sequenceMotif)
     outNetwork = createExpandedNetwork(inNetwork, kmers, reverseMap)
     saveJson(outFilename, outNetwork)
@@ -137,6 +191,8 @@ def expandModelAlphabet(options):
     Expand nanonet model file to include all possible outputs from an expanded model
 
     :param options: Namespace object from argparse
+
+    # TODO: remove dependence on argparse options
     """
     run(options.currenntTemplate, options.expandedTemplate, options.kmer,
             options.sequenceMotif, options.force)
