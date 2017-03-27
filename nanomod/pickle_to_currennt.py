@@ -33,16 +33,14 @@ import numpy as np
 
 from utils import preventOverwrite
 
-def get_parser():
-    parser = argparse.ArgumentParser(
-        description='Convert currennt json network file into pickle. Makes assumptions about meta data.',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument('input', help='File containing current network')
-    parser.add_argument('output', help='Output pickle file')
-    return parser
-
 def parse_layer_input(in_network):
+    """
+    Create input layer from nanonet nn object
+
+    :param in_network: nn network object from nanonet
+
+    :returns layer: dictionary Layer description
+    """
     size = in_network.meta['n_features']
     layer = { "name" : "input",
               "type" : "input",
@@ -50,8 +48,16 @@ def parse_layer_input(in_network):
     return layer
 
 def parse_layer_feedforward(layer, layer_type, idx):
+    """
+    Parse an nn FeedForward object.
+
+    :param layer: FeedForward layer object from nanonet
+
+    :returns l: dictionary Layer description
+    :returns weights: dictionary Layer weights
+    """
     size = layer.out_size
-    l = get_layer_dict(layer_type, idx, size)
+    l = get___layer_parse_func_dict__(layer_type, idx, size)
     weights = dict()
     weights['input'] = layer.W.transpose().flatten()
     weights['bias'] = layer.b
@@ -72,8 +78,16 @@ def parse_layer_feedforward_linear(size, weights):
 
 
 def parse_layer_softmax(layer, layer_type, idx):
+    """
+    Parse an nn softmax object.
+
+    :param layer: softmax layer object from nanonet
+
+    :returns l: dictionary Layer description
+    :returns weights: dictionary Layer weights
+    """
     size = layer.out_size
-    l = get_layer_dict(layer_type, idx, size)
+    l = get___layer_parse_func_dict__(layer_type, idx, size)
     weights = dict()
     weights['input'] = layer.W.transpose().flatten()
     weights['bias'] = layer.b
@@ -82,6 +96,13 @@ def parse_layer_softmax(layer, layer_type, idx):
 
 
 def parse_layer_multiclass(in_network):
+    """
+    Create multiclass output layer from nanonet nn object
+
+    :param in_network: nn network object from nanonet
+
+    :returns layer: dictionary Layer description
+    """
     size = len(in_network.meta['kmers'])
     layer = { "name": "postoutput",
               "type": "multiclass_classification",
@@ -90,9 +111,17 @@ def parse_layer_multiclass(in_network):
 
 
 def parse_layer_blstm(layer, layer_type, idx):
+    """
+    Parse an nn BLSTM object.
+
+    :param layer: BLSTM layer object from nanonet
+
+    :returns l: dictionary Layer description
+    :returns weights: dictionary Layer weights
+    """
     # get layer description
     size = layer.layers[0].size * 2
-    l = get_layer_dict(layer_type, idx, size)
+    l = get___layer_parse_func_dict__(layer_type, idx, size)
 
     # get raw weights from forward and reverse
     iM1, lM1, bM1, pM1 = get_lstm_weights(layer.layers[0])
@@ -127,7 +156,15 @@ def parse_layer_blstm(layer, layer_type, idx):
     return l, weights
 
 def parse_layer_lstm(size, weights):
-    l = get_layer_dict(layer_type, idx, layer.size)
+    """
+    Parse an nn LSTM object.
+
+    :param layer: LSTM layer object from nanonet
+
+    :returns l: dictionary Layer description
+    :returns weights: dictionary Layer weights
+    """
+    l = get___layer_parse_func_dict__(layer_type, idx, layer.size)
 
     weights=dict()
     iM, bM, lM, pM = get_lstm_weights(layer)
@@ -140,14 +177,27 @@ def parse_layer_lstm(size, weights):
     return l, weights
 
 def get_lstm_weights(layer):
-    # retrieve weights from nn
+    """
+    Retrieve LSTM weights from the nn LSTM object.
+
+    :param layer: LSTM layer object from nanonet
+
+    :returns iW: list of floats Input weights
+    :returns lW: list of floats Internal weights
+    :returns b: list of floats Bias weights
+    :returns p: list of floats Peek weights
+    """
     iW = layer.iW.reshape((-1,1,layer.size))
     lW = layer.lW.reshape(layer.size,4,layer.size).transpose(1,0,2)
     b = layer.b.reshape((4,-1))
     p = layer.p
     return iW, lW, b, p
 
-LAYER_DICT = {'input' : parse_layer_input,
+__layer_name_dict__ = {'BiRNN' : 'blstm',
+                    'FeedForward' : 'feedforward_tanh',
+                    'SoftMax' : 'softmax' }
+
+__layer_parse_func_dict__ = {'input' : parse_layer_input,
               'blstm' : parse_layer_blstm,
               'feedforward_tanh' : parse_layer_feedforward_tanh,
               'feedforward_logistic' : parse_layer_feedforward_sigmoid,
@@ -157,40 +207,82 @@ LAYER_DICT = {'input' : parse_layer_input,
               'softmax' : parse_layer_softmax,
               'multiclass_classification' : parse_layer_multiclass}
 
-
 def parse_layer(layer, idx):
+    """
+    Parse a layer object from nanonet.
+
+    :param layer: Layer object from nanonet
+    :param idx: int Layer index
+
+    :returns l: dictionary Layer description
+    :returns w: dictionary Layer weights
+    """
     layer_type = get_layer_type(layer)
-    if not layer_type in LAYER_DICT:
+    if not layer_type in __layer_parse_func_dict__:
         sys.stderr.write('Unsupported layer type {}.\n'.format(layer_type))
         exit(1)
-    l, w = LAYER_DICT[layer_type](layer, layer_type, idx)
+    l, w = __layer_parse_func_dict__[layer_type](layer, layer_type, idx)
 
     #de-numpythonise
     for key in w:
         w[key] = w[key].tolist()
     return l, w
 
-LAYER_NAME_DICT = {'BiRNN' : 'blstm',
-                   'FeedForward' : 'feedforward_tanh',
-                   'SoftMax' : 'softmax' }
-
 def get_layer_type(layer):
-    return LAYER_NAME_DICT[type(layer).__name__]
+    """
+    Find the CURRENNT layer type corresponding to a Layer object from nanonet
+
+    :param layer: Layer object from nanonet
+
+    :returns: string Layer type
+
+    >>> get_layer_type(nanonet.nn.BiRNN())
+    "blstm"
+    """
+    return __layer_name_dict__[type(layer).__name__]
 
 def get_layer_name(layer_type, idx):
+    """
+    Create a name for a given layer.
+
+    :param layer_type: string Type of layer
+    :param idx: int Layer index
+
+    :returns: string Layer name
+
+    >>> get_layer_name("blstm", 5)
+    "blstm_5"
+    """
     return "{}_{}".format(layer_type, idx)
 
-def get_layer_dict(layer_type, idx, size):
-    return { "name" : "{}_{}".format(layer_type, idx),
+def get___layer_parse_func_dict__(layer_type, idx, size):
+    """
+    Create a basic layer dictionary.
+
+    :param layer_type: string Type of layer to be created
+    :param idx: int Layer index
+    :param size: int Number of units in layer
+
+    :returns: dictionary representing layer
+
+    >>> get___layer_parse_func_dict__("blstm", 5, 128)
+    { "name" : "blstm_5", "type" : "blstm", "size" : 128, "bias" : 1.0 }
+
+    TODO: why bias 1?
+    """
+    return { "name" : get_layer_name(layer_type, idx),
              "type" : layer_type,
              "size" : size,
-             "bias" : 1.0 } # why bias 1?
+             "bias" : 1.0 }
 
 def numpy_to_network(in_network):
-    """Transform a numpy representation of a network into a json
-    representation.
     """
+    Transform a numpy representation of a network into a json representation.
 
+    :param in_network: nn object from nanonet to be converted
+
+    :returns: dictionary Coverted network
+    """
     layers = list()
     weights = dict()
 
@@ -212,6 +304,16 @@ def numpy_to_network(in_network):
              "meta" : in_network.meta }
 
 def runConvertPickle(in_filename, out_filename):
+    """
+    Convert 'pickled' nn object from nanonet to a JSON file.
+
+    This script reverse engineered from currennt_to_pickle.py in nanonet.
+
+    :param in_filename: string Path to pickled network (.npy file)
+    :param out_filename: string Path to output network (.json file)
+
+    :returns: int Exit code: 1 if aborted, 0 if run successfully
+    """
     try:
         in_network = np.load(in_filename).item()
     except:
@@ -224,13 +326,38 @@ def runConvertPickle(in_filename, out_filename):
     return 0
 
 def convertPickle(options):
+    """
+    Run tool from nanomod.
+
+    :param options: Namespace object from argparse
+
+    :returns: int Exit code: 1 if aborted, 0 if run successfully
+    """
     # TODO: don't need to pass options to this function
     if preventOverwrite(options.currenntTemplate, options.force) == 1:
         return 1
     return runConvertPickle(options.nanonetTemplate, options.currenntTemplate)
 
+def parse_args():
+    """
+    Parse arguments for running from command line.
+
+    :returns: Namespace object from argparse
+    """
+    parser = argparse.ArgumentParser(
+        description='Convert currennt json network file into pickle. Makes assumptions about meta data.',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument('input', help='File containing current network')
+    parser.add_argument('output', help='Output pickle file')
+    return parser.parse_args()
 
 if __name__ == '__main__':
-    args = get_parser().parse_args()
+    """
+    This tool can be run directly from the command line.
+
+    Example: python pickle_to_currennt.py in_network.npy out_network.json
+    """
+    args = parse_args()
     runConvertPickle(args.input, args.output)
 
