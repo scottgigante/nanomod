@@ -1,5 +1,5 @@
 import os
-from setuptools import setup
+from setuptools import setup, find_packages()
 
 version_py = os.path.join(os.path.dirname(__file__), 'nanomod', '__init__.py')
 version = open(version_py).read().strip().split('=')[-1].replace('"','').strip()
@@ -14,10 +14,10 @@ def read(fname):
 
 setup(
   name = 'nanomod',
-  packages = ['nanomod'],
+  packages = find_packages(),
   package_dir={'nanomod': "nanomod"},
   version=version,
-  install_requires=['h5py>2.2.0', 'biopython', 'pysam'],
+  install_requires=['numpy>=1.7', 'h5py>2.2.0', 'biopython', 'pysam',],
   requires=['python (>=2.7, <3.0)'],
   description = 'A tool designed to call base modifications on Oxford Nanopore Technologies\' MinION sequencing data.',
   long_description=read('README.md'),

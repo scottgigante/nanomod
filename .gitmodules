@@ -1,0 +1,3 @@
+[submodule "nanonet"]
+	path = nanomod/nanonet
+	url = https://github.com/nanoporetech/nanonet.git
