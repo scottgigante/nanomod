@@ -11,10 +11,9 @@ before_install:
   - sudo python setup.py install
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
   - cd ..
-  - wget --no-check-certificate -O bwa.bz2 https://sourceforge.net/projects/bio-bwa/files/latest/download?source=files
-  - tar xvf bwa.bz2
-  - ls
-  - ./configure && make && make install
+  - git clone https://github.com/lh3/bwa.git
+  - cd bwa
+  - make
   - cd ..
 install: "python setup.py install"
 # command to run tests
