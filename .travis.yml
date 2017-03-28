@@ -11,7 +11,6 @@ before_install:
   - sudo python setup.py install
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
   - cd ..
-  - export PYTHONPATH=$PYTHONPATH:$(pwd)
 install: "python setup.py install"
 # command to run tests
 script: nanomod train -g sample_data/ecoli_k12_mg1655.fa -c sample_data/r9/canonical -m sample_data/r9/modified -t 10 -o sample_data/test -vv

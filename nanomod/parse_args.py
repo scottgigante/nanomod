@@ -277,7 +277,7 @@ def parseArgs():
             "Example usage: nanomod call -r sample_data/r9/modified -m "
             "models/5mc.nanomod -o data/test.fa"),
             formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("command", choices=("train","call"))
+    command = parser.add_argument("command", choices=("train","call"))
     parser.add_argument("options", nargs=argparse.REMAINDER)
 
     #parse command line options
@@ -286,8 +286,8 @@ def parseArgs():
     try:
         options = parseCommandArgs(initialOptions.command, initialOptions.options)
     except NameError as e:
-        if str(e).endswith(" command not defined")
-            raise argparse.ArgumentError(initialOptions.command, "Command {} not found".format(initialOptions.command))
+        if str(e).endswith(" command not defined"):
+            raise argparse.ArgumentError(command, "Command {} not found".format(initialOptions.command))
         else:
             raise
 
