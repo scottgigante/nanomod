@@ -220,7 +220,7 @@ def parse_layer(layer, idx):
     """
     layer_type = get_layer_type(layer)
     if not layer_type in __layer_parse_func_dict__:
-        sys.stderr.write('Unsupported layer type {}.\n'.format(layer_type))
+        logging.error('Unsupported layer type {}.\n'.format(layer_type))
         exit(1)
     l, w = __layer_parse_func_dict__[layer_type](layer, layer_type, idx)
 
@@ -318,8 +318,8 @@ def runConvertPickle(in_filename, out_filename):
     try:
         in_network = np.load(in_filename).item()
     except:
-        sys.stderr.write('Failed to read from {}.\n'.format(in_filename))
-        raise e
+        logging.error('Failed to read from {}.\n'.format(in_filename))
+        raise
         return 1
 
     network = numpy_to_network(in_network)
