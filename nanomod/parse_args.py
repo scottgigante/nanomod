@@ -218,7 +218,7 @@ def addTrainArgs(parser):
             dest="rate", help="Randomly introduce errors to avoid overfitting.")
     parser.add_argument("--val-fraction", type=float, default=0.05,
             dest="valFraction", help="Fraction of data used for validation set")
-    parser.add_argument("--data-fraction", type=float, default=1,
+    parser.add_argument("--data-fraction", type=float, default=0.1,
             dest="dataFraction", help="Fraction of data to be sent to nanonet")
     parser.add_argument("--select-mode", default=__modes__, nargs="*",
             help=("Method for choosing reads to send to nanonet; choose any or"
@@ -226,6 +226,8 @@ def addTrainArgs(parser):
             dest="selectMode")
     parser.add_argument("--read-length", default=2000, type=int,
             dest="readLength", help="Minimum read length for training reads.")
+    parser.add_argument("--mapping-quality", default=60, type=int,
+            dest="mappingQuality", help="Minimum mapping quality for training reads.")
 
     return parser
 

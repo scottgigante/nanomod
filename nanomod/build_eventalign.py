@@ -31,6 +31,7 @@ from multiprocessing import Pool
 from functools import partial
 import subprocess
 import logging
+import fnmatch
 
 from utils import callSubProcess, multiprocessWrapper, preventOverwrite
 from . import __exe__
@@ -63,7 +64,7 @@ def callPoretoolsWrapper(args):
     """
     return multiprocessWrapper(callPoretools, args)
 
-def multithreadPoretools(poretools, tempDir, force, reads, output, filesPerCall=1000):
+def multithreadPoretools(poretools, tempDir, force, reads, output, readLength=2000, filesPerCall=1000):
     """
     Runs poretools multithreaded on small chunks of fasta files
 
@@ -85,7 +86,7 @@ def multithreadPoretools(poretools, tempDir, force, reads, output, filesPerCall=
     os.chdir(reads)
     files = [os.path.join(cwd, reads, f) for f in glob.glob("*.fast5")]
     os.chdir(cwd)
-    prefix = [poretools, "fasta", "--type", "fwd"]
+    prefix = [poretools, "fasta", "--type", "fwd", "--min-length", str(readLength)]
 
     calls = [prefix + files[i:i + filesPerCall] for i in xrange(0, len(files),
             filesPerCall)]
@@ -103,7 +104,7 @@ def multithreadPoretools(poretools, tempDir, force, reads, output, filesPerCall=
                 for line in infile:
                     outfile.write(line)
 
-def buildSortedBam(threads, genome, fastaFile, outPrefix, force):
+def buildSortedBam(threads, genome, fastaFile, outPrefix, force, mapq=30):
     """
     Build an indexed sorted bam from a fasta file.
 
@@ -111,12 +112,13 @@ def buildSortedBam(threads, genome, fastaFile, outPrefix, force):
     :param genome: string path to genome fasta file
     :param fastaFile: string path to reads fasta file
     :param force: Boolean value, force creation or not
+    :param mapq: int Minimum mapq to output (default: 30, same as bwa mem)
 
     :returns: string path to sorted bam file
     """
     samFile = "{}.sam".format(outPrefix)
-    callSubProcess('{} mem -x ont2d -t {} {} {}'.format(__exe__['bwa'], threads,
-            genome, fastaFile), force, outputFile=samFile, newFile=samFile)
+    callSubProcess('{} mem -x ont2d -t {} -T {} {} {}'.format(__exe__['bwa'], threads,
+            mapq, genome, fastaFile), force, outputFile=samFile, newFile=samFile)
 
     sortedBamFile = "{}.sorted.bam".format(outPrefix)
     callSubProcess('samtools sort -o {} -O bam -@ {} -T nanomod {}'.format(sortedBamFile, threads, samFile), force, newFile = sortedBamFile)
@@ -127,6 +129,23 @@ def buildSortedBam(threads, genome, fastaFile, outPrefix, force):
 
     return sortedBamFile
 
+def bamReadCount(bamfile):
+    """
+    Return a tuple of the number of mapped reads in a bam file
+
+    From https://www.biostars.org/p/1890/
+
+    :param bamfile: string Path to indexed bam file
+
+    :returns: int Number of mapped reads
+    """
+    p = callSubProcess(['samtools', 'idxstats', bamfile], outputFile=subprocess.PIPE)
+    mapped = 0
+    for line in p.stdout:
+        rname, rlen, nm, nu = line.rstrip().split()
+        mapped += int(nm)
+    return mapped
+
 def buildEventalign(options, reads, outPrefix):
     """
     Build eventalign file according to nanopolish's pipeline.
@@ -135,7 +154,15 @@ def buildEventalign(options, reads, outPrefix):
 
     :returns fastaFile: String Filename of fasta corresponding to reads
     :returns eventalignFile: String Filename of eventalign tsv
+    :returns readProp: float Proportion of original fast5 files contained in eventalign
     """
+
+    # check how many files we have to begin with
+    fast5Count = 0
+    for root, dirnames, filenames in os.walk(reads):
+        for filename in fnmatch.filter(filenames, '*.fast5'):
+            fast5Count += 1
+    logging.debug("Found {} fast5 files.".format(fast5Count))
 
     fastaFile = '{}.fasta'.format(outPrefix)
     # build fasta using poretools so we have index to fast5 files
@@ -143,13 +170,13 @@ def buildEventalign(options, reads, outPrefix):
         try:
             # GNU parallel
             callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X {} fasta '
-                    '--type fwd {}').format(reads,
-                    __exe__['poretools'],"{}"), options.force, newFile=fastaFile,
+                    '--type fwd --min-length {} {}').format(reads,
+                    __exe__['poretools'], options.readLength, "{}"), options.force, newFile=fastaFile,
                     outputFile=fastaFile)
         except Exception:
             # something went wrong - are we missing paralle?
             # use our custom multiprocessing script
-            multithreadPoretools(__exe__['poretools'], options.tempDir, options.force, reads, fastaFile)
+            multithreadPoretools(__exe__['poretools'], options.tempDir, options.force, reads, fastaFile, options.readLength)
     else:
         # single threaded poretools - slow
         callSubProcess(('{} fasta --type fwd {}').format(__exe__['poretools'],
@@ -160,7 +187,10 @@ def buildEventalign(options, reads, outPrefix):
             options.force, newFile="{}.bwt".format(options.genome))
 
     # build sorted bam file using bwa mem
-    sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, outPrefix, options.force)
+    sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, outPrefix, options.force, mapq=options.mappingQuality)
+    mappedCount = bamReadCount(sortedBamFile)
+    logging.debug("Mapped {} reads.".format(mappedCount))
+    readProp = float(mappedCount) / fast5Count
 
     # run nanopolish eventalign
     eventalignFile = "{}.eventalign".format(outPrefix)
@@ -169,4 +199,4 @@ def buildEventalign(options, reads, outPrefix):
             fastaFile, sortedBamFile, options.genome, options.nanopolishModels),
             options.force, newFile=eventalignFile, outputFile=eventalignFile)
 
-    return fastaFile, eventalignFile
+    return fastaFile, eventalignFile, readProp

@@ -64,7 +64,7 @@ def preventOverwrite(file, force):
             return True
     return False
 
-def callSubProcess(call, force, newFile=None, outputFile=None, close_fds=True,
+def callSubProcess(call, force=False, newFile=None, outputFile=None, close_fds=True,
         shell=True, mode='w'):
     """
     Call subprocess to create a new file using an external script if the file

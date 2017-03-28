@@ -66,7 +66,10 @@ def buildTrainingSet(options, reads, outPrefix, modified=False):
     :param reads: Directory for fast5 reads
     :param outPrefix: Prefix for output files
     """
-    fasta, eventalign = buildEventalign(options, reads, outPrefix)
+    fasta, eventalign, readProp = buildEventalign(options, reads, outPrefix)
+    # we've cut out some reads - adjust data fraction
+    options.dataFraction = min(1, options.dataFraction / readProp)
+    logging.debug("Retaining {} of remaining data.".format(options.dataFraction))
     embedEventalign(options, fasta, eventalign, reads, outPrefix, modified)
     if "random" in options.selectMode:
         # overwrite small training sets with random selection
