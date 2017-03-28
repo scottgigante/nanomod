@@ -12,4 +12,4 @@ before_install:
   - cd ..
 install: "python setup.py install"
 # command to run tests
-script: nanomod train -g models/ecoli_k12_mg1655.fa -c sample_data/r9/canonical -m sample_data/r9/modified -t 10 -o sample_data/test -vv
+script: nanomod train -g /home/travis/build/scottgigante/nanomod/models/ecoli_k12_mg1655.fa -c /home/travis/build/scottgigante/nanomod/sample_data/r9/canonical -m /home/travis/build/scottgigante/nanomod/sample_data/r9/modified -t 10 -o /home/travis/build/scottgigante/nanomod/sample_data/test --nanopolish-models /home/travis/build/scottgigante/nanomod/models/nanopolish_models.fofn-vv
