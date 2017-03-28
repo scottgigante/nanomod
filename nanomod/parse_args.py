@@ -285,7 +285,10 @@ def parseArgs():
 
     try:
         options = parseCommandArgs(initialOptions.command, initialOptions.options)
-    except NameError:
-        raise argparse.ArgumentError(initialOptions.command, "Command {} not found".format(initialOptions.command))
+    except NameError as e:
+        if str(e).endswith(" command not defined")
+            raise argparse.ArgumentError(initialOptions.command, "Command {} not found".format(initialOptions.command))
+        else:
+            raise
 
     return initialOptions.command, options
