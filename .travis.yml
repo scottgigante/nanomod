@@ -11,13 +11,13 @@ before_install:
   - wget https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
   - tar xf samtools-1.4.tar.bz2
   - cd samtools-1.4
-  - mkdir bin && make && make prefix=bin install
+  - mkdir bin && make -s && make -s prefix=bin install
   - export PATH=$PATH:$(pwd)/bin
   - cd ..
-  - sudo apt-get -qq install -y libhdf5-serial-dev python-h5py libblas-dev liblapack-dev libatlas-base-dev gfortran samtools parallel
+  - sudo apt-get -qq install -y libhdf5-serial-dev python-h5py libblas-dev liblapack-dev libatlas-base-dev gfortran parallel python-numpy python-scipy python-matplotlib python-pandas
   - git clone -q --recursive https://github.com/jts/nanopolish.git
   - cd nanopolish
-  - make -s
+  - make -s >> /dev/null
   - export PATH=$PATH:$(pwd)
   - cd ..
   - git clone -q https://github.com/nanoporetech/nanonet.git
