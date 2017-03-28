@@ -14,6 +14,7 @@ before_install:
   - mkdir bin && make -s && make -s prefix=$(pwd)/bin install
   - export PATH=$PATH:$(pwd)/bin
   - cd ..
+  - echo $PATH
   - samtools --help
   - sudo apt-get -qq install -y libhdf5-serial-dev python-h5py libblas-dev liblapack-dev libatlas-base-dev gfortran parallel python-numpy python-scipy python-matplotlib python-pandas
   - git clone -q --recursive https://github.com/jts/nanopolish.git
