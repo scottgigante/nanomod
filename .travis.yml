@@ -12,4 +12,4 @@ before_install:
   - cd ..
 install: "python setup.py install"
 # command to run tests
-script: nanomod train -g models/ecoli_k12_mg1655.fa -c sample_data/r9/canonical -m sample_data/r9/modified -t 10 -o sample_data/test
+script: nanomod train -g models/ecoli_k12_mg1655.fa -c sample_data/r9/canonical -m sample_data/r9/modified -t 10 -o sample_data/test -vv

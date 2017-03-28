@@ -251,6 +251,7 @@ def parseCommandArgs(command, argv):
     options = parser.parse_args(argv)
     configureLog(options.verbosity)
     logging.debug("nanomod {} {}".format(command, " ".join(argv)))
+    logging.debug(os.getcwd())
 
     initialiseArgs(command, options)
 
