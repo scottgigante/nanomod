@@ -34,6 +34,7 @@ from multiprocessing import cpu_count
 import tempfile
 import shutil
 import logging
+import numpy as np
 
 from utils import makeDir, configureLog
 from pickle_to_currennt import convertPickle
@@ -117,6 +118,7 @@ def initialiseArgs(command, options):
     """
     # sequence motif should all be uppercase
     options.sequenceMotif = [s.upper() for s in options.sequenceMotif]
+    np.random.seed(options.seed)
 
     if command == "train":
         initialiseTrainArgs(options)
@@ -158,6 +160,7 @@ def addCommonArgs(parser):
     parser.add_argument("-t", "--threads", type=int, default=cpu_count(),
             dest="threads",
             help="Number of threads to be used in multiprocessing")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for read selection.")
     return parser
 
 def addCallArgs(parser):
@@ -184,7 +187,7 @@ def addCallArgs(parser):
             help="Parameter for uninformative Beta prior")
 
     return parser
-
+nanonettrain --train ../nanomod/data/lucattini_no_phage/ --train_list ../nanomod/data/lucattini_no_phage.train.txt.small --val ../nanomod/data/lucattini_no_phage/ --val_list ../nanomod/data/lucattini_no_phage.val.txt.small --output data/lucattini_no_phage_5mer --kmer_length 5 --parallel_sequences 80 --workspace tmp3 --model ../nanomod/data/lucattini_no_phage_auto.best.jsn --cuda --bases ACGTM
 def addTrainArgs(parser):
     """
     Add arguments unique to nanomod train
