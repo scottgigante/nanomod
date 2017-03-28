@@ -12,8 +12,8 @@ before_install:
   - tar xf samtools-1.4.tar.bz2
   - cd samtools-1.4
   - mkdir bin && make && make prefix=$(pwd)/bin install
-  - export PATH=$PATH:$(pwd)/bin
-  - ls -lrt bin
+  - export PATH=$PATH:$(pwd)/bin/bin
+  - ls -lrt bin/bin
   - ls -lrt
   - cd ..
   - echo $PATH
