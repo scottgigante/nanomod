@@ -11,7 +11,7 @@ before_install:
   - sudo apt-get -qq install -y libhdf5-serial-dev python-h5py libblas-dev liblapack-dev libatlas-base-dev gfortran samtools parallel
   - git clone -q --recursive https://github.com/jts/nanopolish.git
   - cd nanopolish
-  - make --quiet
+  - make -s
   - export PATH=$PATH:$(pwd)
   - cd ..
   - git clone -q https://github.com/nanoporetech/nanonet.git
@@ -21,13 +21,13 @@ before_install:
   - cd ..
   - git clone -q https://github.com/lh3/bwa.git
   - cd bwa
-  - make --quiet
+  - make -s
   - export PATH=$PATH:$(pwd)
   - cd ..
   - wget https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
   - tar xf samtools-1.4.tar.bz2
   - cd samtools-1.4
-  - mkdir bin && make -q && make -q prefix=bin install
+  - mkdir bin && make && make prefix=bin install
   - export PYTHONPATH=$PYTHONPATH:$(pwd)/bin
   - cd ..
 install: "python setup.py install -q"
