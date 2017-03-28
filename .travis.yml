@@ -8,35 +8,33 @@ before_install:
   - sudo apt-get -qq update
   - sudo apt-get -qq install -y gcc-4.8 g++-4.8
   - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8
-  - wget https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
+  - wget -q https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
   - tar xf samtools-1.4.tar.bz2
   - cd samtools-1.4
-  - mkdir bin && make -s && make -s prefix=$(pwd)/bin install
-  - export PATH=$PATH:$(pwd)/bin/bin
-  - ls -lrt bin/bin
-  - ls -lrt
+  - mkdir bin && make -s && make -s prefix=$(pwd) install
+  - export PATH=$PATH:$(pwd)/bin
   - cd ..
   - echo $PATH
-  - samtools &> /dev/null
+  - which samtools &> /dev/null
   - sudo apt-get -qq install -y libhdf5-serial-dev python-h5py libblas-dev liblapack-dev libatlas-base-dev gfortran parallel python-numpy python-scipy python-matplotlib python-pandas &> /dev/null
   - git clone -q --recursive https://github.com/jts/nanopolish.git
   - cd nanopolish
   - make -s &> /dev/null
   - export PATH=$PATH:$(pwd)
   - cd ..
-  - nanopolish &> /dev/null
+  - which nanopolish &> /dev/null
   - git clone -q https://github.com/nanoporetech/nanonet.git
   - cd nanonet
   - sudo python setup.py install &> /dev/null
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
   - cd ..
-  - nanonettrain &> /dev/null
+  - which nanonettrain &> /dev/null
   - git clone -q https://github.com/lh3/bwa.git
   - cd bwa
   - make -s
   - export PATH=$PATH:$(pwd)
   - cd ..
-  - bwa
+  - which bwa
 install: "python setup.py install -q"
 # command to run tests
 script: nanomod train -g sample_data/ecoli_k12_mg1655.fa -c sample_data/r9/canonical -m sample_data/r9/modified -t 10 -o sample_data/test -vv
