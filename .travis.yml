@@ -5,7 +5,7 @@ python:
 sudo: required
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get install -y libhdf5-serial-dev python-h5py libblas-dev liblapack-dev libatlas-base-dev gfortran
+  - sudo apt-get install -y libhdf5-serial-dev python-h5py libblas-dev liblapack-dev libatlas-base-dev gfortran samtools
   - git clone https://github.com/nanoporetech/nanonet.git
   - cd nanonet
   - sudo python setup.py install
