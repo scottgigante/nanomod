@@ -30,6 +30,7 @@ import argparse
 import json
 import sys
 import numpy as np
+import logging
 
 from utils import preventOverwrite
 
@@ -336,6 +337,7 @@ def convertPickle(options):
     # TODO: don't need to pass options to this function
     if preventOverwrite(options.currenntTemplate, options.force) == 1:
         return 1
+    logging.info("Converting nanonet network {} to currennt network {}.".format(options.nanonetTemplate, options.currenntTemplate))
     return runConvertPickle(options.nanonetTemplate, options.currenntTemplate)
 
 def parse_args():
