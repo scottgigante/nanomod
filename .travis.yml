@@ -6,10 +6,6 @@ sudo: required
 before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y libhdf5-serial-dev python-h5py
-  - git clone https://github.com/nanoporetech/nanonet.git
-  - cd nanonet
-  - sudo python setup.py install
-  - cd ..
 install: "python setup.py install"
 # command to run tests
-script: nanomod train -g models/ecoli_k12_mg1655.fa -c sample_data/r9/canonical -m sample_data/r9/modified -t 10 -o sample_data/test -vv
+script: nanomod train -g sample_data/ecoli_k12_mg1655.fa -c sample_data/r9/canonical -m sample_data/r9/modified -t 10 -o sample_data/test -vv
