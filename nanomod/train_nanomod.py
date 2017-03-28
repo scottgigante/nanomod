@@ -31,6 +31,7 @@
 import os
 import sys
 import shutil
+import logging
 
 from utils import callSubProcess
 from build_eventalign import buildEventalign

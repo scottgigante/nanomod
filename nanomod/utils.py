@@ -94,7 +94,7 @@ def callSubProcess(call, force=False, newFile=None, outputFile=None, close_fds=T
         else:
             # don't print stdout from subprocess
             out=open(os.devnull, 'w')
-        subprocess.call(call, stdout=out, close_fds=close_fds, shell=shell)
+        p = subprocess.call(call, stdout=out, close_fds=close_fds, shell=shell)
 
         # check the file was created, if given
         assert(newFile is None or os.path.isfile(newFile))
@@ -102,7 +102,7 @@ def callSubProcess(call, force=False, newFile=None, outputFile=None, close_fds=T
         logging.warning("OSError: has a dependency changed path? Try deleting nanomod/.*.config.json and try again.")
         # TODO: fix this automatically - maybe a --check-dependencies option?
         raise e
-    return 0
+    return p
 
 def makeDir(dir):
     """

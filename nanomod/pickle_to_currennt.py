@@ -58,7 +58,7 @@ def parse_layer_feedforward(layer, layer_type, idx):
     :returns weights: dictionary Layer weights
     """
     size = layer.out_size
-    l = get___layer_parse_func_dict__(layer_type, idx, size)
+    l = get_layer_dict(layer_type, idx, size)
     weights = dict()
     weights['input'] = layer.W.transpose().flatten()
     weights['bias'] = layer.b
@@ -88,7 +88,7 @@ def parse_layer_softmax(layer, layer_type, idx):
     :returns weights: dictionary Layer weights
     """
     size = layer.out_size
-    l = get___layer_parse_func_dict__(layer_type, idx, size)
+    l = get_layer_dict(layer_type, idx, size)
     weights = dict()
     weights['input'] = layer.W.transpose().flatten()
     weights['bias'] = layer.b
@@ -122,7 +122,7 @@ def parse_layer_blstm(layer, layer_type, idx):
     """
     # get layer description
     size = layer.layers[0].size * 2
-    l = get___layer_parse_func_dict__(layer_type, idx, size)
+    l = get_layer_dict(layer_type, idx, size)
 
     # get raw weights from forward and reverse
     iM1, lM1, bM1, pM1 = get_lstm_weights(layer.layers[0])
@@ -165,7 +165,7 @@ def parse_layer_lstm(size, weights):
     :returns l: dictionary Layer description
     :returns weights: dictionary Layer weights
     """
-    l = get___layer_parse_func_dict__(layer_type, idx, layer.size)
+    l = get_layer_dict(layer_type, idx, layer.size)
 
     weights=dict()
     iM, bM, lM, pM = get_lstm_weights(layer)
@@ -256,7 +256,7 @@ def get_layer_name(layer_type, idx):
     """
     return "{}_{}".format(layer_type, idx)
 
-def get___layer_parse_func_dict__(layer_type, idx, size):
+def get_layer_dict(layer_type, idx, size):
     """
     Create a basic layer dictionary.
 
@@ -266,7 +266,7 @@ def get___layer_parse_func_dict__(layer_type, idx, size):
 
     :returns: dictionary representing layer
 
-    >>> get___layer_parse_func_dict__("blstm", 5, 128)
+    >>> get_layer_dict("blstm", 5, 128)
     { "name" : "blstm_5", "type" : "blstm", "size" : 128, "bias" : 1.0 }
 
     TODO: why bias 1?

@@ -139,7 +139,7 @@ def bamReadCount(bamfile):
 
     :returns: int Number of mapped reads
     """
-    p = callSubProcess(['samtools', 'idxstats', bamfile], outputFile=subprocess.PIPE)
+    p = subprocess.Popen(['samtools', 'idxstats', bamfile], stdout=subprocess.PIPE)
     mapped = 0
     for line in p.stdout:
         rname, rlen, nm, nu = line.rstrip().split()
