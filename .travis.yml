@@ -12,8 +12,8 @@ before_install:
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
   - cd ..
   - wget --no-check-certificate -O bwa.bz2 https://sourceforge.net/projects/bio-bwa/files/latest/download?source=files
-  - mkdir bwa && tar xvf bwa.bz2 -C bwa --strip-components 1
-  - cd bwa
+  - tar xvf bwa.bz2
+  - cd bwa*
   - ./configure && make && make install
   - cd ..
 install: "python setup.py install"
