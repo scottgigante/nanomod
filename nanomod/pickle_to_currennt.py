@@ -319,6 +319,7 @@ def runConvertPickle(in_filename, out_filename):
         in_network = np.load(in_filename).item()
     except:
         sys.stderr.write('Failed to read from {}.\n'.format(in_filename))
+        raise e
         return 1
 
     network = numpy_to_network(in_network)
