@@ -14,6 +14,7 @@ before_install:
   - git clone https://github.com/lh3/bwa.git
   - cd bwa
   - make
+  - export PATH=$PATH:$(pwd)
   - cd ..
 install: "python setup.py install"
 # command to run tests
