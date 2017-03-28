@@ -187,7 +187,7 @@ def addCallArgs(parser):
             help="Parameter for uninformative Beta prior")
 
     return parser
-nanonettrain --train ../nanomod/data/lucattini_no_phage/ --train_list ../nanomod/data/lucattini_no_phage.train.txt.small --val ../nanomod/data/lucattini_no_phage/ --val_list ../nanomod/data/lucattini_no_phage.val.txt.small --output data/lucattini_no_phage_5mer --kmer_length 5 --parallel_sequences 80 --workspace tmp3 --model ../nanomod/data/lucattini_no_phage_auto.best.jsn --cuda --bases ACGTM
+
 def addTrainArgs(parser):
     """
     Add arguments unique to nanomod train
