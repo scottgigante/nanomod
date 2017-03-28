@@ -13,7 +13,6 @@ before_install:
   - cd ..
   - wget --no-check-certificate -O bwa.bz2 https://sourceforge.net/projects/bio-bwa/files/latest/download?source=files
   - tar xvf bwa.bz2
-  - cd bwa*
   - ls
   - ./configure && make && make install
   - cd ..
