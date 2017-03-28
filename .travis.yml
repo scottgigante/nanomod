@@ -14,22 +14,26 @@ before_install:
   - mkdir bin && make -s && make -s prefix=$(pwd)/bin install
   - export PATH=$PATH:$(pwd)/bin
   - cd ..
+  - samtools --help
   - sudo apt-get -qq install -y libhdf5-serial-dev python-h5py libblas-dev liblapack-dev libatlas-base-dev gfortran parallel python-numpy python-scipy python-matplotlib python-pandas
   - git clone -q --recursive https://github.com/jts/nanopolish.git
   - cd nanopolish
   - make -s >> /dev/null
   - export PATH=$PATH:$(pwd)
   - cd ..
+  - nanopolish --help
   - git clone -q https://github.com/nanoporetech/nanonet.git
   - cd nanonet
   - sudo python setup.py install -q
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
   - cd ..
+  - nanonettrain --help
   - git clone -q https://github.com/lh3/bwa.git
   - cd bwa
   - make -s
   - export PATH=$PATH:$(pwd)
   - cd ..
+  - bwa --help
 install: "python setup.py install -q"
 # command to run tests
 script: nanomod train -g sample_data/ecoli_k12_mg1655.fa -c sample_data/r9/canonical -m sample_data/r9/modified -t 10 -o sample_data/test -vv
