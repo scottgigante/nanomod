@@ -107,6 +107,8 @@ def trainNanomod(options):
 
     :param options: Namespace from argparse
     """
+    import logging
+    logging.debug(os.getcwd())
     try:
         if options.modifiedReads is not None:
             canonicalPrefix = "{}.canonical".format(options.outPrefix)
