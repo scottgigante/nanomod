@@ -194,12 +194,9 @@ def buildEventalign(options, reads, outPrefix):
 
     # run nanopolish eventalign
     eventalignFile = "{}.eventalign".format(outPrefix)
-    callSubProcess(('{} eventalign -t {} --print-read-names -r {} -b {} -g {}'
-            #' --models {}'
-            ).format(__exe__['nanopolish'], options.threads,
-            fastaFile, sortedBamFile, options.genome,
-            # options.nanopolishModels
-            ),
-            options.force, newFile=eventalignFile, outputFile=eventalignFile)
+    callSubProcess('{} eventalign -t {} --print-read-names -r {} -b {} -g {}'.format(
+            __exe__['nanopolish'], options.threads, fastaFile, sortedBamFile,
+            options.genome), options.force, newFile=eventalignFile,
+            outputFile=eventalignFile)
 
     return fastaFile, eventalignFile, readProp

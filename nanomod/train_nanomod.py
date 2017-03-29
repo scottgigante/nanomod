@@ -48,17 +48,6 @@ def clean(options):
     # delete temp files
     shutil.rmtree(options.tempDir)
 
-    # delete models from cwd
-    modelsFile = os.path.basename(options.nanopolishModels)
-    cwd = os.getcwd()
-    newModels = os.path.join(cwd, modelsFile)
-    if newModels != options.nanopolishModels:
-        with open(options.nanopolishModels, 'r') as models:
-            for line in models.readlines():
-                model = line.strip()
-                os.remove(os.path.join(cwd, model))
-        os.remove(newModels)
-
 def buildTrainingSet(options, reads, outPrefix, modified=False):
     """
     Build training set for a single MinION run

@@ -79,26 +79,6 @@ def initialiseTrainArgs(options):
     for i in range(len(options.sequenceMotif)):
         options.sequenceMotif[i] = options.sequenceMotif[i].upper()
 
-    # move models files to current working directory for eventalign
-    modelsFile = os.path.basename(options.nanopolishModels)
-    cwd = os.getcwd()
-    newModels = os.path.join(cwd, modelsFile)
-    if (not options.force and newModels != options.nanopolishModels and
-            os.path.isfile(newModels)):
-        logging.warning(('{} already exists in current working directory. Use --force to '
-                'overwrite.').format(modelsFile))
-        options.nanopolishModels = newModels
-    else:
-        logging.info('Copying {} to current working directory.'.format(
-                options.nanopolishModels))
-        modelsPath = os.path.dirname(options.nanopolishModels)
-        with open(options.nanopolishModels, 'r') as models:
-            for line in models.readlines():
-                model = line.strip()
-                shutil.copy(os.path.join(modelsPath, model),
-                        os.path.join(cwd, model))
-        shutil.copy(options.nanopolishModels, newModels)
-
     # convert ONT model to json
     options.currenntTemplate = "{}.json".format(options.nanonetTemplate)
     convertPickle(options)
@@ -210,10 +190,6 @@ def addTrainArgs(parser):
     parser.add_argument("--temp-dir",
             default="{}/nanomod".format(tempfile.gettempdir()),
             dest="tempDir", help="Directory for nanomod temporary files")
-    parser.add_argument("--nanopolish-models",
-            default="models/nanopolish_models.fofn", dest="nanopolishModels",
-            help=("Nanopolish models for eventalign. "
-            "Note: will be copied to current working directory"))
     parser.add_argument("--nanonet-template", dest="nanonetTemplate",
             default="models/r9_template.npy",
             help="Nanonet model file for network initialisation")
