@@ -25,7 +25,7 @@ before_install:
   - which samtools &> /dev/null
   - git clone -q --recursive https://github.com/jts/nanopolish.git
   - cd nanopolish
-  - make -s
+  - make -s CXXFLAGS="-g -O3 -std=c++11 -fopenmp -w" CFLAGS="-O3 -w"
   - export PATH=$PATH:$(pwd)
   - cd ..
   - which nanopolish &> /dev/null
