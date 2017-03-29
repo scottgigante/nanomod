@@ -8,12 +8,12 @@ before_install:
   - sudo apt-get -qq update
   - sudo apt-get -qq install -y gcc-4.8 g++-4.8
   - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8
-  - sudo apt-get -qq install -y libhdf5-serial-dev libblas-dev liblapack-dev parallel libatlas-base-dev gfortran
-  - pip install cython
+  - sudo apt-get -qq install -y libhdf5-serial-dev libblas-dev liblapack-dev parallel libatlas-base-dev gfortran &> /dev/null
+  - pip install -q cython pysam
   - sudo apt-get -qq install -y python-h5py python-scipy python-matplotlib python-pandas &> /dev/null
   - git clone -q https://github.com/arq5x/poretools
   - cd poretools
-  - sudo python setup.py -q install
+  - sudo python setup.py -q install --no-deps
   - cd ..
   - which poretools &> /dev/null
   - wget -q https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
@@ -31,7 +31,7 @@ before_install:
   - which nanopolish &> /dev/null
   - git clone -q https://github.com/nanoporetech/nanonet.git
   - cd nanonet
-  - sudo python setup.py -q install &> /dev/null
+  - sudo python setup.py -q install --no-deps &> /dev/null
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
   - cd ..
   - which nanonettrain &> /dev/null
@@ -41,6 +41,6 @@ before_install:
   - export PATH=$PATH:$(pwd)
   - cd ..
   - which bwa
-install: "python setup.py -q install"
+install: "python setup.py -q install --no-deps"
 # command to run tests
 script: nanomod train -g sample_data/ecoli_k12_mg1655.fa -c sample_data/r9/canonical -m sample_data/r9/modified -t 10 -o sample_data/test -vv
