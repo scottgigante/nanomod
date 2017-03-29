@@ -28,11 +28,10 @@ from call_nanomod import callNanomod
 from parse_args import parseArgs
 from . import init
 
-# run main script
-#
-# @args argv sys.argv
-# @return None
 def run():
+    """
+    Run Nanomod.
+    """
     command, options = parseArgs()
     # check executables
     init(command)
@@ -44,6 +43,8 @@ def run():
         # panic
         raise argparse.ArgumentError(command, "Command {} not found".format(command))
 
-
 if __name__ == "__main__":
+    """
+    Run from command line.
+    """
     run()
