@@ -28,12 +28,16 @@ import logging
 from . import __exe__
 from seq_tools import expandAlphabet
 
-# main script. Run nanonettrain
-#
-# @args options Namespace object from argparse
-# @return None
 def trainNanonet(options):
+    """
+    Train nanonet from nanomod output.
 
+    At present, we just print the command for the user to run, since we assume nanomod is not run on a GPU-enabled machine.
+
+    :param options: Namespace object from argparse
+
+    TODO: what should we return? can we try running nanonet?
+    """
     logging.info(("{0} --train {1} --train_list {1}.train.txt.small --val {1}"
                    " --val_list {1}.val.txt.small --output {1} --kmer_length "
                    "{2} --parallel_sequences {3} --workspace {4} --cache_path "
@@ -41,4 +45,3 @@ def trainNanonet(options):
                    options.outPrefix, options.kmer, options.parallelSequences,
                    options.tempDir, options.expandedTemplate, "".join(expandAlphabet(options.sequenceMotif))))
     return None
-    # TODO: what should we return
