@@ -8,6 +8,7 @@ before_install:
   - sudo apt-get -qq update
   - sudo apt-get -qq install -y gcc-4.8 g++-4.8
   - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.8
+  - sudo apt-get -qq install -y libhdf5-serial-dev python-h5py libblas-dev liblapack-dev libatlas-base-dev gfortran parallel python-numpy python-scipy python-matplotlib python-pandas &> /dev/null
   - git clone -q https://github.com/arq5x/poretools
   - cd poretools
   - sudo python setup.py -q install
@@ -20,7 +21,6 @@ before_install:
   - export PATH=$PATH:$(pwd)/bin
   - cd ..
   - which samtools &> /dev/null
-  - sudo apt-get -qq install -y libhdf5-serial-dev python-h5py libblas-dev liblapack-dev libatlas-base-dev gfortran parallel python-numpy python-scipy python-matplotlib python-pandas &> /dev/null
   - git clone -q --recursive https://github.com/jts/nanopolish.git
   - cd nanopolish
   - make -s &> /dev/null
