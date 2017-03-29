@@ -32,15 +32,33 @@ import os
 import json
 import numpy as np
 import logging
+import itertools
 
 from utils import multiprocessWrapper
 from seq_tools import loadGenome, getSeqDiff
 
 def getBayesPercentage(numMods, numUnmods, alpha):
+    """
+    A naive Bayesian estimator of likelihood of modification at this site. Will be deprecated by a GLM.
+
+    :param numMods: int Number of reads observed as modified at this site
+    :param numUnmods: int Number of reads observed as unmodified at this site
+    :param alpha: Hyperparameter for beta prior
+    """
     # TODO: can we use coverage vs. numMods + numUnmods to get a clever value for alpha?
     return float(numMods + alpha)/(numMods + numUnmods + alpha)
 
 def checkModifiedPositions(options):
+    """
+    Find all positions on genome where modification motif appears.
+
+    :param options: Namespace object from argparse
+
+    :returns modPositions: Dictionary of dictionaries: one dict for each contig, each of which has one dict for forward and one for reverse, each of which is a list of integer positions of modified motifs
+    :returns canonGenome: Seq.Seq Unmodified genome sequence
+
+    TODO: can we remove dependence on options here?
+    """
     modPositions = dict()
     canonGenome = loadGenome(options)
     modGenome = loadGenome(options, modified=True)
@@ -56,6 +74,18 @@ def checkModifiedPositions(options):
 
 def checkReadModification(queryName, readPos, readLength, cigarTuples, reverse,
         modDir):
+    """
+    Check if a read is modified at a point.
+
+    :param queryName: string Read unique identifier
+    :param readPos: int Genomic position on read
+    :param readLength: int Length of read
+    :param cigarTuples: list of tuples of ints, converted cigar string from BAM record
+    :param reverse: boolean, True if read is reverse read, False otherwise
+    :param modDir: string Path to folder of records marking where reads were modified
+
+    :returns: Boolean, True if modified, False otherwise
+    """
     # TODO: check that this checks the correct position
     if reverse:
         readPos = -readPos-1
@@ -72,6 +102,32 @@ def checkReadModification(queryName, readPos, readLength, cigarTuples, reverse,
     return False
 
 def checkMotif(readPos, sequenceMotif, motifModPos, seq, deletion=False):
+    """
+    Check whether the motif is correctly or incorrectly called around a modification.
+
+    :param readPos: int Position on the read
+    :param sequenceMotif: two-element list of strings, canonical motif, modified motif
+    :param motifModPos: int Position of modified base on motif
+    :param seq: string Read sequence
+    :param deletion: Boolean value, true if modified base is deleted in read, false otherwise
+
+    :returns: Boolean value, true if motif (excluding modified base) is called correctly, false otherwise
+
+    >>> checkMotif(5, ["CATG", "CMTG"], 1, "AAAACATGGGG", False)
+    True
+
+    >>> checkMotif(5, ["CATG", "CMTG"], 1, "AAAACMTGGGG", False)
+    True
+
+    >>> checkMotif(5, ["CATG", "CMTG"], 1, "AAAAGATGGGG", False)
+    False
+
+    >>> checkMotif(5, ["CATG", "CMTG"], 1, "AAAACTGGGG", True)
+    True
+
+    >>> checkMotif(5, ["CATG", "CMTG"], 1, "AAAACGT", False)
+    True
+    """
     # check after modpos
     if deletion:
         readIdx = readPos
@@ -104,6 +160,20 @@ def checkMotif(readPos, sequenceMotif, motifModPos, seq, deletion=False):
 
 def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, modDir,
         dtype, options):
+    """
+    Process modification motifs over a genomic window.
+
+    :param pileupColumn: pysam.PileupColumn Pileup of reads at genomic position
+    :param modPositions: list of int List of all genomic locations with modification motif
+    :param motifModPos: int Position containing modification within motif
+    :param genome: Seq.Seq forward sequence of reference genome
+    :param contig: string Contig / chromosome name
+    :param modDir: string Path to directory listing all modifications per read
+    :param dtype: numpy.dtype Data type for output ndarray
+    :param options: Namespace object from argparse
+
+    :returns: numpy.ndarray Position, counts, and predicted modification percentage at this location, or None if no motif exists
+    """
     refPos = pileupColumn.reference_pos
 
     # check if there are any modifiable bases in this position on reference
@@ -170,6 +240,23 @@ def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, 
 
 def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions, motifModPos,
         genome, modDir, dtype, options):
+    """
+    Process modification motifs over a genomic window.
+
+    :param bamFile: string Path to sorted indexed bam file
+    :param contig: string Contig / chromosome name
+    :param startPos: int Window genomic location start (0-based)
+    :param endPos: int Window genomic location end (1-based)
+    :param alpha: float Hyperparamter for Beta prior
+    :param modPositions: list of int List of all genomic locations with modification motif
+    :param motifModPos: int Position containing modification within motif
+    :param genome: Seq.Seq forward sequence of reference genome
+    :param modDir: string Path to directory listing all modifications per read
+    :param dtype: numpy.dtype Data type for output ndarray
+    :param options: Namespace object from argparse
+
+    :returns: numpy.ndarray Position, counts, and predicted modification percentage at each motif location
+    """
     bam = pysam.AlignmentFile(bamFile, "rb")
     output = np.empty(shape=(0,), dtype=dtype)
     for base in bam.pileup(contig, startPos, endPos):
@@ -184,12 +271,31 @@ def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions, motifM
     return output
 
 def processWindowWrapper(args):
+    """
+    Multiprocessing wrapper for processWindow
+
+    :param args: List of arguments for processWindow
+
+    :returns: return value from processWindow
+    """
     return multiprocessWrapper(processWindow, args)
 
 def aggregateWindowCounts(modCounts, pos, row, forwardStep, backStep, contig,
         aggDtype, options):
-    """ forwardStep 1-based end position
-    backStep 0-based start position """
+    """
+    Aggregate counts over a window of multiple bases.
+
+    :param modCounts: numpy ndarray Single-base modification count output
+    :param pos: int Genomic location at which to start window
+    :param row: int Data location (motif site index) at which to start window
+    :param backStep: int 0-based start position before pos
+    :param forwardStep: 1-based end position after pos
+    :param contig: string Contig / chromosome name
+    :param addDtype: numpy.dtype Data type for output ndarray
+    :param options: Namespace object from argparse
+
+    :returns: numpy.ndarray Modification counts aggregated over windows
+    """
     # coarse window
     countsWindow = modCounts[range(max(0, row-backStep),
             min(modCounts.shape[0], row+forwardStep))]
@@ -199,17 +305,35 @@ def aggregateWindowCounts(modCounts, pos, row, forwardStep, backStep, contig,
     countsWindow = countsWindow[np.logical_and(afterStart, beforeEnd)]
     startPos = min(countsWindow['f1'])
     endPos = max(countsWindow['f1'])
-    numMods = sum(countsWindow['f3'])
-    numUnmods = sum(countsWindow['f4'])
-    numReads = sum(countsWindow['f5'])
+    count = { 'M' : 0, # modified in correct motif
+              'U' : 0, # unmodified in correct motif
+              'u' : 0, # unmodified in incorrect motif
+              'X' : 0, # mismatch in otherwise correct motif
+              'x' : 0, # mismatch in incorrect motif
+              'D' : 0, # deletion in otherwise correct motif
+              'd' : 0  # deletion in incorrect motif
+            }
+    for base, column in zip(count.keys(), ['f{}'.format(i+3) for i in range(len(count))]):
+        count[base] = sum(countsWindow[column])
     print [startPos, endPos, numReads]
     modProb = getBayesPercentage(numMods, numUnmods, numReads,
                 options.alpha)
-    return np.array([(contig, startPos, endPos, modProb, numMods, numUnmods,
-            numReads)], dtype=aggDtype)
+    return np.array([tuple(itertools.chain([contig, startPos, endPos, modProb], count.values()))], dtype=aggDtype)
 
 def countModifications(bamFile, modDir, options):
-    # TODO: allow specifying a window to reduce time cost
+    """
+    Count modifications at recognised motif sites along the genome.
+
+    :param bamFile: string Path to sorted indexed bam file
+    :param modDir: string Path to directory listing all modifications per read
+    :param options: Namespace object from argparse
+
+    :returns fmt: numpy.savetxt format for output
+    :returns header: string Header for output tsv
+    :returns modCounts: numpy ndarray Position, counts, and predicted modification percentage at each motif location
+
+    # TODO: use consistent output for window of 1 and window of X
+    """
     logging.info("Indexing modification sites on reference genome...")
     modPositions, genome = checkModifiedPositions(options)
     motifModPos = [i for i in xrange(len(options.sequenceMotif[0])) if options.sequenceMotif[0][i] != options.sequenceMotif[1][i]][0]
