@@ -31,7 +31,7 @@ before_install:
   - which nanopolish &> /dev/null
   - git clone -q https://github.com/nanoporetech/nanonet.git
   - cd nanonet
-  - sudo python setup.py -q install --no-deps &> /dev/null
+  - sudo python setup.py -q install &> /dev/null
   - export PYTHONPATH=$PYTHONPATH:$(pwd)
   - cd ..
   - which nanonettrain &> /dev/null
