@@ -169,8 +169,8 @@ def buildEventalign(options, reads, outPrefix):
     if True:
         try:
             # GNU parallel
-            callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X $(pwd)/{} fasta '
-                    '--type fwd --min-length {} {}').format(reads,
+            callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X {} fasta '
+                    '--type fwd --min-length {} $(pwd)/{}').format(reads,
                     __exe__['poretools'], options.readLength, "{}"), options.force, newFile=fastaFile,
                     outputFile=fastaFile)
         except Exception:
