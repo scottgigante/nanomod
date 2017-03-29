@@ -25,7 +25,7 @@ before_install:
   - which samtools &> /dev/null
   - git clone -q --recursive https://github.com/jts/nanopolish.git
   - cd nanopolish
-  - make -s &> /dev/null
+  - make -s
   - export PATH=$PATH:$(pwd)
   - cd ..
   - which nanopolish &> /dev/null
