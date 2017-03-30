@@ -242,7 +242,7 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
                 readLength, kmer, genome)
     except Exception as e:
         logging.warning("Failed to save {}.".format(fast5File))
-        print str(e)
+        logging.warning(str(e))
         return [fast5File, False]
     return [fast5File, pass_quality]
 
@@ -333,7 +333,7 @@ def writeTempFiles(options, eventalign, refs):
                     n += 1
                     premadeFilenames.add(fast5Name)
                     continue
-                elif preventOverwrite(filename + ".npy", options.force):
+                elif preventOverwrite(filename + ".npy", options.force, logging.debug):
                     skip=True
                     n += 1
                     filenames.add(fast5Path)

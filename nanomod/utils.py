@@ -47,7 +47,7 @@ def configureLog(level=0):
         level = 0
     logging.basicConfig(format='[%(levelname)s] %(message)s', level=__log_levels__[level])
 
-def preventOverwrite(file, force):
+def preventOverwrite(file, force, logFunc=None):
     """
     Check if we are accidentally overwriting something
 
@@ -58,9 +58,13 @@ def preventOverwrite(file, force):
     """
     if file is not None and os.path.isfile(file):
         if force:
-            logging.info("{} already exists. Forcing recreation.".format(file))
+            if logFunc is None:
+                logFunc = logging.info
+            logFunc("{} already exists. Forcing recreation.".format(file))
         else:
-            logging.warning("{} already exists. Use --force to recompute.".format(file))
+            if logFunc is None:
+                logFunc = logging.warning
+            logFunc("{} already exists. Use --force to recompute.".format(file))
             return True
     return False
 
