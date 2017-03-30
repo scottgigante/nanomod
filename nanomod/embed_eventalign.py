@@ -297,7 +297,7 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
                             break
                     except IOError as e:
                         logging.warning("Failed to write {}.npy: {}".format(filename, e))
-                if end is not None and i > end:
+                if stop is not None and i > stop:
                     # we're done!
                     break
 
