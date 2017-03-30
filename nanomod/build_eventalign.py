@@ -121,11 +121,16 @@ def buildSortedBam(threads, genome, fastaFile, outPrefix, force, mapq=30):
             mapq, genome, fastaFile), force, outputFile=samFile, newFile=samFile)
 
     sortedBamFile = "{}.sorted.bam".format(outPrefix)
-    callSubProcess('samtools sort -o {} -O bam -@ {} -T nanomod {}'.format(sortedBamFile, threads, samFile), force, newFile = sortedBamFile)
-    os.remove(samFile)
 
-    callSubProcess('{} index {}'.format(__exe__['samtools'], sortedBamFile),
-            force, newFile="{}.bai".format(sortedBamFile))
+    if not preventOverwrite(sortedBamFile, force):
+        callSubProcess('{} mem -x ont2d -t {} -T {} {} {}'.format(__exe__['bwa'], threads,
+                mapq, genome, fastaFile), force, outputFile=samFile, newFile=samFile)
+
+        callSubProcess('samtools sort -o {} -O bam -@ {} -T nanomod {}'.format(sortedBamFile, threads, samFile), force, newFile = sortedBamFile)
+        os.remove(samFile)
+
+        callSubProcess('{} index {}'.format(__exe__['samtools'], sortedBamFile),
+                force, newFile="{}.bai".format(sortedBamFile))
 
     return sortedBamFile
 
