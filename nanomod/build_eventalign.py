@@ -117,9 +117,6 @@ def buildSortedBam(threads, genome, fastaFile, outPrefix, force, mapq=30):
     :returns: string path to sorted bam file
     """
     samFile = "{}.sam".format(outPrefix)
-    callSubProcess('{} mem -x ont2d -t {} -T {} {} {}'.format(__exe__['bwa'], threads,
-            mapq, genome, fastaFile), force, outputFile=samFile, newFile=samFile)
-
     sortedBamFile = "{}.sorted.bam".format(outPrefix)
 
     if not preventOverwrite(sortedBamFile, force):
