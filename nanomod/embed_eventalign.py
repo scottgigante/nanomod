@@ -498,7 +498,7 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
     :param modified: Boolean value, whether or not reads have modified motif
     """
     output = "{}.train.txt.small".format(outPrefix)
-    if preventOverwrite(output, options):
+    if preventOverwrite(output, options.force):
         return 1
     makeDir(options.outPrefix)
 
