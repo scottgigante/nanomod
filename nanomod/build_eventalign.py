@@ -159,9 +159,8 @@ def buildEventalign(options, reads, outPrefix):
 
     # check how many files we have to begin with
     fast5Count = 0
-    for root, dirnames, filenames in os.walk(reads):
-        for filename in fnmatch.filter(filenames, '*.fast5'):
-            fast5Count += 1
+    for _, _, filenames in os.walk(reads):
+        fast5Count += sum(1 for _ in fnmatch.filter(filenames, '*.fast5'))
     logging.debug("Found {} fast5 files.".format(fast5Count))
 
     fastaFile = '{}.fasta'.format(outPrefix)
