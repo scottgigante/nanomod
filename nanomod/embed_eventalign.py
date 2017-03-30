@@ -389,7 +389,7 @@ def processEventalign(options, eventalign, refs):
         filenames, premadeFilenames = tuple(itertools.chain(*i) for i in itertools.izip(*data))
     else:
         filenames, premadeFilenames = processEventalignWorker(options, eventalign, refs, idx, options.numReads, 0, None)
-    return filename, idx, premadeFilenames, kmer
+    return filenames, idx, premadeFilenames, kmer
 
 def checkPremade(options, filename):
     """
