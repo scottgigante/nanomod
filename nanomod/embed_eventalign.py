@@ -518,7 +518,7 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
         logging.debug(str(options.constraints))
 
     logging.info("Splitting eventalign into separate files...")
-    filenames, idx, premadeFilenames, kmer = writeTempFiles(options, eventalign, refs)
+    filenames, idx, premadeFilenames, kmer = processEventalign(options, eventalign, refs)
     pool = Pool(options.threads)
     alphabet = expandAlphabet(options.sequenceMotif)
 
