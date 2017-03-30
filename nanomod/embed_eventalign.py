@@ -276,7 +276,7 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
         premadeFilenames = set()
         n=0
 
-        for i, line in reader.enumerate():
+        for i, line in enumerate(reader):
 
             if i < start:
                 continue
