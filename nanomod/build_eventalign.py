@@ -160,11 +160,7 @@ def buildEventalign(options, reads, outPrefix):
     """
 
     # check how many files we have to begin with
-    fast5Count = 0
-    for root, dirnames, filenames in os.walk(reads):
-        for filename in fnmatch.filter(filenames, '*.fast5'):
-            fast5Count += 1
-    logging.debug("Found {} fast5 files.".format(fast5Count))
+    find_reads = subprocess.Popen('find {} -name "*.fast5" | wc -l'.format(reads), stdout=subprocess.PIPE, shell=True)
 
     fastaFile = '{}.fasta'.format(outPrefix)
     # build fasta using poretools so we have index to fast5 files
@@ -191,8 +187,9 @@ def buildEventalign(options, reads, outPrefix):
     # build sorted bam file using bwa mem
     sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, outPrefix, options.force, mapq=options.mappingQuality)
     mappedCount = bamReadCount(sortedBamFile)
-    logging.debug("Mapped {} reads.".format(mappedCount))
+    fast5Count= int(find_reads.communicate()[0])
     readProp = float(mappedCount) / fast5Count
+    logging.debug("Mapped {} of {} reads.".format(mappedCount, fast5Count))
 
     # run nanopolish eventalign
     eventalignFile = "{}.eventalign".format(outPrefix)

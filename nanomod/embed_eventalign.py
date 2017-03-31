@@ -33,6 +33,7 @@ import h5py
 import numpy as np
 import csv
 import logging
+import itertools
 from numpy.lib.recfunctions import append_fields, drop_fields
 from multiprocessing import Pool, cpu_count
 from shutil import copyfile
@@ -40,6 +41,8 @@ from shutil import copyfile
 from seq_tools import *
 from utils import makeDir, multiprocessWrapper, preventOverwrite
 from check_skip_stay_prob import getSkipStayConstraints
+
+__max_read_len__ = 1000000
 
 def getOutfile(fast5, options):
     """
@@ -246,7 +249,99 @@ def processRead(options, idx, fast5Path, genome, modified, kmer, alphabet):
         return [fast5File, False]
     return [fast5File, pass_quality]
 
-def writeTempFiles(options, eventalign, refs):
+def processEventalignWorker(options, eventalign, refs, idx, numReads, start, stop):
+    """
+    Write temporary .npy files to split eventalign tsv file into chunks
+    corresponding to one fast5 file each - this allows multiprocessing later on.
+
+    :param options: Namespace object from argparse
+    :param eventalign: String filename of eventalign tsv
+    :param refs: dictionary linking read names and fast5 file paths
+    :param idx: dictionary linking headers with positions in the tsv
+    :param start: int Starting line at which to begin processing (0-based)
+    :param end: int Ending line at which to end processing (1-based)
+
+    :returns filenames: array_like list of paths to fast5 files which have been processed
+    :returns premadeFilenames: list of basenames of fast5 files which had already been processed prior to this call to Nanomod
+    """
+
+    with open(eventalign, 'r') as tsv:
+        reader = csv.reader(tsv, delimiter="\t")
+        reader.next() # headers
+        current_read_name = ""
+        skip=True
+        started=False if start > 0 else True
+        tmp=None
+        filenames = set()
+        premadeFilenames = set()
+        n=0
+
+        for i, line in enumerate(reader):
+
+            if i < start:
+                continue
+            if skip and line[idx['read_name']] == current_read_name:
+                continue
+            elif line[idx['read_name']] != current_read_name:
+                if not started:
+                    # just started - could be half way through a read
+                    started=True
+                    skip=True
+                    continue
+                if tmp is not None and len(tmp) > 0:
+                    try:
+                        np.save(filename,tmp)
+                        logging.debug("Saving {}.npy".format(filename))
+                        n += 1
+                        if numReads > 0 and n >= numReads:
+                            break
+                    except IOError as e:
+                        logging.warning("Failed to write {}.npy: {}".format(filename, e))
+                if stop is not None and i > stop:
+                    # we're done!
+                    break
+
+                # new read, initialise
+                tmp = []
+                current_read_name = line[idx['read_name']]
+                try:
+                    fast5Path = refs[current_read_name]
+                except KeyError:
+                    skip = True
+                    logging.warning(current_read_name + " not found.")
+                    continue
+
+                fast5Name = fast5Path.split('/')[-1]
+                if line[idx['strand']] != 't':
+                    # not template, skip
+                    skip=True
+                    continue
+
+                outfile = getOutfile(fast5Name, options)
+                filename = os.path.join(options.tempDir, fast5Name)
+                if preventOverwrite(outfile, options.force):
+                    skip=True
+                    premadeFilenames.add(fast5Name)
+                    continue
+                elif preventOverwrite(filename + ".npy", options.force, logging.debug):
+                    skip=True
+                    filenames.add(fast5Path)
+                    continue
+
+                filenames.add(fast5Path)
+                skip=False
+
+            tmp.append(line)
+
+        # last one gets missed
+        # TODO: should we exclude fail reads earlier to save time?
+        if tmp is not None and len(tmp) > 0:
+            np.save(filename,tmp)
+            logging.debug("Saving {}.npy".format(filename))
+
+    return filenames, premadeFilenames
+
+def processEventalign(options, eventalign, refs):
     """
     Write temporary .npy files to split eventalign tsv file into chunks
     corresponding to one fast5 file each - this allows multiprocessing later on.
@@ -284,72 +379,16 @@ def writeTempFiles(options, eventalign, refs):
         kmer=len(line[idx['ref_kmer']])
         # TODO: can we do this without reopening?
 
-    with open(eventalign, 'r') as tsv:
-        reader = csv.reader(tsv, delimiter="\t")
-        reader.next() # headers
-        current_read_name = ""
-        skip=True
-        tmp=None
-        filenames = set()
-        premadeFilenames = set()
-        n=0
-
-        for line in reader:
-
-            if skip and line[idx['read_name']] == current_read_name:
-                continue
-            elif line[idx['read_name']] != current_read_name:
-                if tmp is not None and len(tmp) > 0:
-                    try:
-                        np.save(filename,tmp)
-                        logging.debug("Saving {}.npy".format(filename))
-                        n += 1
-                    except IOError as e:
-                        logging.warning("Failed to write {}.npy: {}".format(filename, e))
-                if options.numReads > 0 and n >= options.numReads:
-                    # we're done!
-                    break
-
-                # new read, initialise
-                tmp = []
-                current_read_name = line[idx['read_name']]
-                try:
-                    fast5Path = refs[current_read_name]
-                except KeyError:
-                    skip = True
-                    logging.warning(current_read_name + " not found.")
-                    continue
-
-                fast5Name = fast5Path.split('/')[-1]
-                if line[idx['strand']] != 't':
-                    # not template, skip
-                    skip=True
-                    continue
-
-                outfile = getOutfile(fast5Name, options)
-                filename = os.path.join(options.tempDir, fast5Name)
-                if preventOverwrite(outfile, options.force):
-                    skip=True
-                    n += 1
-                    premadeFilenames.add(fast5Name)
-                    continue
-                elif preventOverwrite(filename + ".npy", options.force, logging.debug):
-                    skip=True
-                    n += 1
-                    filenames.add(fast5Path)
-                    continue
-
-                filenames.add(fast5Path)
-                skip=False
-
-            tmp.append(line)
-
-        # last one gets missed
-        # TODO: should we exclude fail reads earlier to save time?
-        if tmp is not None and len(tmp) > 0:
-            np.save(filename,tmp)
-            logging.debug("Saving {}.npy".format(filename))
-
+    if options.threads > 1 and options.numReads <= 0:
+        nlines = sum(1 for _ in open(eventalign, 'r'))
+        pool = Pool(options.threads)
+        data = pool.map(processEventalignWorkerWrapper,
+                [[options, eventalign, refs, idx, -1, i, i + __max_read_len__] for i in reversed(xrange(0, nlines, __max_read_len__))])
+        pool.close()
+        pool.join()
+        filenames, premadeFilenames = tuple(itertools.chain(*i) for i in itertools.izip(*data))
+    else:
+        filenames, premadeFilenames = processEventalignWorker(options, eventalign, refs, idx, options.numReads, 0, None)
     return filenames, idx, premadeFilenames, kmer
 
 def checkPremade(options, filename):
@@ -426,6 +465,17 @@ def processReadWrapper(args):
     """
     return multiprocessWrapper(processRead, args)
 
+
+def processEventalignWorkerWrapper(args):
+    """
+    Multiprocessing wrapper for processEventalignWorker
+
+    :param args: List of arguments for processEventalignWorker
+
+    :returns: return value from processEventalignWorker
+    """
+    return multiprocessWrapper(processEventalignWorker, args)
+
 def checkPremadeWrapper(args):
     """
     Multiprocessing wrapper for checkPremade
@@ -448,7 +498,7 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
     :param modified: Boolean value, whether or not reads have modified motif
     """
     output = "{}.train.txt.small".format(outPrefix)
-    if preventOverwrite(output, options):
+    if preventOverwrite(output, options.force):
         return 1
     makeDir(options.outPrefix)
 
@@ -468,15 +518,15 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
         logging.debug(str(options.constraints))
 
     logging.info("Splitting eventalign into separate files...")
-    filenames, idx, premadeFilenames, kmer = writeTempFiles(options, eventalign, refs)
+    filenames, idx, premadeFilenames, kmer = processEventalign(options, eventalign, refs)
     pool = Pool(options.threads)
     alphabet = expandAlphabet(options.sequenceMotif)
 
-    logging.info("Embedding labels into {} fast5 files...".format(len(filenames)))
+    logging.info("Embedding labels into fast5 files...")
     trainData = pool.map(processReadWrapper,
             [[options, idx, i, genome, modified, kmer, alphabet] for i in filenames])
 
-    logging.info("Adding data for {} premade fast5 files...".format(len(premadeFilenames)))
+    logging.info("Adding data for premade fast5 files...")
     trainData.extend(pool.map(checkPremadeWrapper,
             [[options, i] for i in premadeFilenames]))
     pool.close()
