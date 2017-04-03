@@ -98,7 +98,10 @@ def initialiseArgs(command, options):
     """
     # sequence motif should all be uppercase
     options.sequenceMotif = [s.upper() for s in options.sequenceMotif]
+
     np.random.seed(options.seed)
+
+    options.threads = max(min(options.threads, cpu_count()), 1)
 
     if command == "train":
         initialiseTrainArgs(options)
