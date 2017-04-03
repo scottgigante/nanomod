@@ -381,7 +381,7 @@ def processEventalign(options, eventalign, refs):
 
     if options.threads > 1 and options.numReads <= 0:
         nlines = sum(1 for _ in open(eventalign, 'r'))
-        threads = min(nlines / __max_read_len__, options.threads)
+        threads = max(min(nlines / __max_read_len__, options.threads), 1)
         pool = Pool(threads)
         splitRange = list(reversed(xrange(0, nlines, threads)))
         if nlines % threads != 0:
