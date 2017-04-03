@@ -155,7 +155,7 @@ def buildEventalign(options, reads, outPrefix):
     :param options: Namespace object from argparse
 
     :returns fastaFile: String Filename of fasta corresponding to reads
-    :returns eventalignFile: String Filename of eventalign tsv
+    :returns eventalign: subprocess.Process Process containing eventalign output
     :returns readProp: float Proportion of original fast5 files contained in eventalign
     """
 
@@ -192,10 +192,6 @@ def buildEventalign(options, reads, outPrefix):
     logging.debug("Mapped {} of {} reads.".format(mappedCount, fast5Count))
 
     # run nanopolish eventalign
-    eventalignFile = "{}.eventalign".format(outPrefix)
-    callSubProcess('{} eventalign -t {} --print-read-names -r {} -b {} -g {}'.format(
-            __exe__['nanopolish'], options.threads, fastaFile, sortedBamFile,
-            options.genome), options.force, newFile=eventalignFile,
-            outputFile=eventalignFile)
+    eventalign = subprocess.Popen('{} eventalign -t {} --print-read-names -r {} -b {} -g {}'.format(__exe__['nanopolish'], options.threads, fastaFile, sortedBamFile, options.genome).split(), stdout=subprocess.PIPE, bufsize=1)
 
-    return fastaFile, eventalignFile, readProp
+    return fastaFile, eventalign, readProp
