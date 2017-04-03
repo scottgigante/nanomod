@@ -68,8 +68,29 @@ def preventOverwrite(file, force, logFunc=None):
             return True
     return False
 
+def callPopen(call, stdin=None, stdout=None, shell=False):
+    """
+    Call subprocess to send output to a pipe
+
+    :param call: The system call to be run as a string or array_like
+    :param: Boolean value, True if we want to overwrite extant files, False otherwise
+    :param stdin: variable containing stdin
+    :param stdout: variable containing stdout
+    :param shell: Use local shell call - true for string call, false for array_like call
+    """
+    try:
+        # print call to debug
+        logging.info(call if shell else " ".join(call))
+
+        p = subprocess.Popen(call, stdin=stdin, stdout=stdout, shell=shell)
+    except OSError as e:
+        logging.warning("OSError: has a dependency changed path? Try deleting nanomod/.*.config.json and try again.")
+        # TODO: fix this automatically - maybe a --check-dependencies option?
+        raise e
+    return p
+
 def callSubProcess(call, force=False, newFile=None, outputFile=None, close_fds=True,
-        shell=True, mode='w'):
+        shell=True, stdin=None, mode='w'):
     """
     Call subprocess to create a new file using an external script if the file
     doesn't already exist
@@ -98,7 +119,7 @@ def callSubProcess(call, force=False, newFile=None, outputFile=None, close_fds=T
         else:
             # don't print stdout from subprocess
             out=open(os.devnull, 'w')
-        p = subprocess.call(call, stdout=out, close_fds=close_fds, shell=shell)
+        p = subprocess.call(call, stdin=stdin, stdout=out, close_fds=close_fds, shell=shell)
 
         # check the file was created, if given
         assert(newFile is None or os.path.isfile(newFile))

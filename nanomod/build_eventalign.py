@@ -33,7 +33,7 @@ import subprocess
 import logging
 import fnmatch
 
-from utils import callSubProcess, multiprocessWrapper, preventOverwrite
+from utils import callSubProcess, callPopen, multiprocessWrapper, preventOverwrite
 from . import __exe__
 
 def callPoretools(call, tempDir, idx):
@@ -120,11 +120,8 @@ def buildSortedBam(threads, genome, fastaFile, outPrefix, force, mapq=30, noSupp
     sortedBamFile = "{}.sorted.bam".format(outPrefix)
 
     if not preventOverwrite(sortedBamFile, force):
-        callSubProcess('{} mem -x ont2d -t {} -T {} {} {} {}'.format(__exe__['bwa'], threads,
-                mapq, '-M' if noSupplementary else '', genome, fastaFile), force, outputFile=samFile, newFile=samFile)
-
-        callSubProcess('samtools sort -o {} -O bam -@ {} -T nanomod {}'.format(sortedBamFile, threads, samFile), force, newFile = sortedBamFile)
-        os.remove(samFile)
+        sam = callPopen('{} mem -x ont2d -t {} -T {} {} {} {}'.format(__exe__['bwa'], threads, mapq, '-M' if noSupplementary else '', genome, fastaFile).split(), stdout=subprocess.PIPE)
+        callSubProcess('samtools sort -o {} -O bam -@ {} -T nanomod -'.format(sortedBamFile, threads), force, stdin=sam.stdout, newFile = sortedBamFile)
 
         callSubProcess('{} index {}'.format(__exe__['samtools'], sortedBamFile),
                 force, newFile="{}.bai".format(sortedBamFile))
