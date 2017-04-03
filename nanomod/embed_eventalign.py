@@ -42,8 +42,6 @@ from seq_tools import *
 from utils import makeDir, multiprocessWrapper, preventOverwrite
 from check_skip_stay_prob import getSkipStayConstraints
 
-__max_read_len__ = 1000000
-
 def getOutfile(fast5, options):
     """
     Get the path of the output file corresponding to a fast5 file.
@@ -382,8 +380,13 @@ def processEventalign(options, eventalign, refs):
     if options.threads > 1 and options.numReads <= 0:
         nlines = sum(1 for _ in open(eventalign, 'r'))
         pool = Pool(options.threads)
+        splitRange = list(reversed(xrange(0, nlines, options.threads)))
+        if nlines % options.threads != 0:
+            # drop the overhang - better to have one long thread that an extra short one
+            splitRange = [nlines] + splitRange[1:]
+
         data = pool.map(processEventalignWorkerWrapper,
-                [[options, eventalign, refs, idx, -1, i, i + __max_read_len__] for i in reversed(xrange(0, nlines, __max_read_len__))])
+                [[options, eventalign, refs, idx, -1, splitRange[i+1], splitRange[i]] for i in range(len(splitRange)-1)])
         pool.close()
         pool.join()
         filenames, premadeFilenames = tuple(itertools.chain(*i) for i in itertools.izip(*data))
