@@ -385,7 +385,7 @@ def processEventalign(options, eventalign, refs):
         pool = Pool(threads)
         splitRange = list(reversed(xrange(0, nlines, nlines / threads)))
         if nlines % threads != 0:
-            # drop the overhang - better to have one long thread that an extra short one
+            # drop the overhang - better to have one long thread than an extra short one
             splitRange = splitRange[1:]
         splitRange = [nlines] + splitRange
 
