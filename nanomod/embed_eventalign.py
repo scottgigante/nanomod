@@ -170,7 +170,7 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
     :param kmer: int length of kmer labels
     :param alphabet: array of base labels in alphabet
 
-    :returns output: array of two-element arrays containing basename of fast5 file and boolean indicating read quality
+    :returns trainData: array of two-element arrays containing basename of fast5 file and boolean indicating read quality
     :returns premadeFilenames: list of basenames of fast5 files which had already been processed prior to this call to Nanomod
     """
 
@@ -182,7 +182,7 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
         started=False if start > 0 else True
         events=None
         filenames = set()
-        output = list()
+        trainData = list()
         premadeFilenames = set()
         n=0
 
@@ -207,7 +207,7 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
                         passQuality = writeFast5(options, events, fast5Path,
                             initial_ref_index, last_ref_index, chromosome, forward,
                             numSkips, numStays, readLength, kmer, genome)
-                        output.append([fast5Name, passQuality])
+                        trainData.append([fast5Name, passQuality])
                         filenames.add(fast5Name)
                         events = None
                         n += 1
@@ -327,12 +327,12 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
                 passQuality = writeFast5(options, events, fast5Path,
                     initial_ref_index, last_ref_index, chromosome, forward,
                     numSkips, numStays, readLength, kmer, genome)
-                output.append([fast5Name, passQuality])
+                trainData.append([fast5Name, passQuality])
             except Exception as e:
                 logging.warning("Failed to save {}.".format(fast5File))
                 logging.warning(str(e))
 
-    return output, premadeFilenames
+    return trainData, premadeFilenames
 
 def processEventalign(options, eventalign, refs, genome, modified, alphabet):
     """
@@ -346,7 +346,7 @@ def processEventalign(options, eventalign, refs, genome, modified, alphabet):
     :param modified: Boolean value, whether or not this fast5 has modified motif
     :param alphabet: array of base labels in alphabet
 
-    :returns output: array of two-element arrays containing basename of fast5 file and boolean indicating read quality
+    :returns trainData: array of two-element arrays containing basename of fast5 file and boolean indicating read quality
     :returns idx: dictionary linking headers with positions in the tsv
     :returns premadeFilenames: list of basenames of fast5 files which had already been processed prior to this call to Nanomod
     """
@@ -386,10 +386,10 @@ def processEventalign(options, eventalign, refs, genome, modified, alphabet):
                 [[options, eventalign, refs, idx, -1, splitRange[i+1], splitRange[i], genome, modified, kmer, alphabet] for i in range(len(splitRange)-1)])
         pool.close()
         pool.join()
-        output, premadeFilenames = tuple(itertools.chain(*i) for i in itertools.izip(*data))
+        trainData, premadeFilenames = tuple(itertools.chain(*i) for i in itertools.izip(*data))
     else:
-        output, premadeFilenames = processEventalignWorker(options, eventalign, refs, idx, options.numReads, 0, None, genome, modified, kmer, alphabet)
-    return output, idx, premadeFilenames
+        trainData, premadeFilenames = processEventalignWorker(options, eventalign, refs, idx, options.numReads, 0, None, genome, modified, kmer, alphabet)
+    return trainData, idx, premadeFilenames
 
 def checkPremade(options, filename):
     """
@@ -523,7 +523,7 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
 
     logging.info("Splitting eventalign into separate files...")
     alphabet = expandAlphabet(options.sequenceMotif)
-    filenames, idx, premadeFilenames, kmer = processEventalign(options, eventalign, refs, genome, modified, alphabet)
+    trainData, idx, premadeFilenames = processEventalign(options, eventalign, refs, genome, modified, alphabet)
 
     pool = Pool(options.threads)
     logging.info("Adding data for premade fast5 files...")
