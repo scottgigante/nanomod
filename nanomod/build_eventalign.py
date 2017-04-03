@@ -192,6 +192,10 @@ def buildEventalign(options, reads, outPrefix):
     logging.debug("Mapped {} of {} reads.".format(mappedCount, fast5Count))
 
     # run nanopolish eventalign
-    eventalign = subprocess.Popen('{} eventalign -t {} --print-read-names -r {} -b {} -g {}'.format(__exe__['nanopolish'], options.threads, fastaFile, sortedBamFile, options.genome).split(), stdout=subprocess.PIPE, bufsize=1)
+    eventalignFile = "{}.eventalign".format(outPrefix)
+    callSubProcess('{} eventalign -t {} --print-read-names -r {} -b {} -g {}'.format(
+            __exe__['nanopolish'], options.threads, fastaFile, sortedBamFile,
+            options.genome), options.force, newFile=eventalignFile,
+            outputFile=eventalignFile)
 
-    return fastaFile, eventalign, readProp
+    return fastaFile, eventalignFile, readProp
