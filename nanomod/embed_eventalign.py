@@ -342,13 +342,14 @@ def processEventalign(options, eventalign, refs, genome, modified, alphabet):
     :param options: Namespace object from argparse
     :param eventalign: String filename of eventalign tsv
     :param refs: dictionary linking read names and fast5 file paths
+    :param genome: Dictionary containing genome records
+    :param modified: Boolean value, whether or not this fast5 has modified motif
+    :param alphabet: array of base labels in alphabet
 
     :returns output: array of two-element arrays containing basename of fast5 file and boolean indicating read quality
     :returns idx: dictionary linking headers with positions in the tsv
     :returns premadeFilenames: list of basenames of fast5 files which had already been processed prior to this call to Nanomod
     """
-    if not os.path.exists(options.tempDir):
-        os.makedirs(options.tempDir)
 
     with open(eventalign, 'r') as tsv:
 
@@ -521,14 +522,10 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
         logging.debug(str(options.constraints))
 
     logging.info("Splitting eventalign into separate files...")
-    filenames, idx, premadeFilenames, kmer = processEventalign(options, eventalign, refs)
-    pool = Pool(options.threads)
     alphabet = expandAlphabet(options.sequenceMotif)
+    filenames, idx, premadeFilenames, kmer = processEventalign(options, eventalign, refs, genome, modified, alphabet)
 
-    logging.info("Embedding labels into fast5 files...")
-    trainData = pool.map(processReadWrapper,
-            [[options, idx, i, genome, modified, kmer, alphabet] for i in filenames])
-
+    pool = Pool(options.threads)
     logging.info("Adding data for premade fast5 files...")
     trainData.extend(pool.map(checkPremadeWrapper,
             [[options, i] for i in premadeFilenames]))
