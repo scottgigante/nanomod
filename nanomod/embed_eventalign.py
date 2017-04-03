@@ -433,6 +433,7 @@ def writeTrainfiles(options, trainData, outPrefix):
     """
     trainFilename = outPrefix + ".train.txt"
     valFilename = outPrefix + ".val.txt"
+    seenFiles = set()
 
     with open(trainFilename, 'w') as trainFile, open(valFilename, 'w') as valFile, open(trainFilename + ".small", 'w') as smallTrainFile, open(valFilename + ".small", 'w') as smallValFile:
 
@@ -443,6 +444,9 @@ def writeTrainfiles(options, trainData, outPrefix):
         smallValFile.write("#filename\n")
 
         for filename, pass_quality in trainData:
+            if filename in seenFiles:
+                continue
+            seenFiles.add(filename)
             if os.path.isfile(getOutfile(filename, options)):
                 if np.random.rand() > options.valFraction:
                     logging.debug("Training set{}: {}".format(" - Selected" if pass_quality else "", filename))
