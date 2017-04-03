@@ -383,10 +383,11 @@ def processEventalign(options, eventalign, refs):
         nlines = sum(1 for _ in open(eventalign, 'r'))
         threads = max(min(nlines / __max_read_len__, options.threads), 1)
         pool = Pool(threads)
-        splitRange = list(reversed(xrange(0, nlines, threads)))
+        splitRange = list(reversed(xrange(0, nlines, nlines / threads)))
         if nlines % threads != 0:
             # drop the overhang - better to have one long thread that an extra short one
-            splitRange = [nlines] + splitRange[1:]
+            splitRange = splitRange[1:]
+        splitRange = [nlines] + splitRange
 
         data = pool.map(processEventalignWorkerWrapper,
                 [[options, eventalign, refs, idx, -1, splitRange[i+1], splitRange[i]] for i in range(len(splitRange)-1)])
