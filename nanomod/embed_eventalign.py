@@ -527,10 +527,10 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
 
     pool = Pool(options.threads)
     logging.info("Adding data for premade fast5 files...")
-    trainData.extend(pool.map(checkPremadeWrapper,
+    itertools.chain(trainData, pool.map(checkPremadeWrapper,
             [[options, i] for i in premadeFilenames]))
     pool.close()
     pool.join()
 
-    logging.info("Saving datasets for {} total fast5 files...".format(len(trainData)))
+    logging.info("Saving datasets...")
     writeTrainfiles(options, trainData, outPrefix)
