@@ -180,6 +180,22 @@ def randomPermuteSeq(seq, alphabet=__canonical__, rate=0.001):
             seq = "".join(seq)
     return seq
 
+def convertSeqToString(seq):
+    """
+    Check if a sequence is a string or Bio.Seq, and return the sequence as a string.
+
+    :param seq: string or Bio.Seq.Seq The sequence to be converted
+
+    :returns seq: string The converted string
+    :returns converted: boolean True if the seq was converted, false otherwise
+    """
+    if type(seq) == Seq.Seq:
+        converted = True
+        seq = str(seq)
+    else:
+        converted = False
+    return seq, converted
+
 def modifySeq(seq, sequenceMotif):
     """
     Apply base modification to a sequence
@@ -192,15 +208,10 @@ def modifySeq(seq, sequenceMotif):
     >>> modifySeq("CAGCGT", ["CG", "MG"])
     "CAGMGT"
     """
-    # TODO: we do this twice - make it a method?
-    if type(seq) == Seq.Seq:
-        returnBioSeq = True
-        seq = str(seq)
-    else:
-        returnBioSeq = False
+    seq, converted = convertSeqToString(seq)
 
     seq = seq.replace(sequenceMotif[0],sequenceMotif[1])
-    return Seq.Seq(seq) if returnBioSeq else seq
+    return Seq.Seq(seq) if converted else seq
 
 def unmodifySeq(seq, sequenceMotif):
     """
@@ -216,11 +227,7 @@ def unmodifySeq(seq, sequenceMotif):
     >>> unmodifySeq("CAGMGM", ["CG", "MG"])
     "CAGCGC"
     """
-    if type(seq) == Seq.Seq:
-        returnBioSeq = True
-        seq = str(seq)
-    else:
-        returnBioSeq = False
+    seq, converted = convertSeqToString(seq)
 
     # we have to check partial matches at either end
     pattern = sequenceMotif[1]
@@ -230,7 +237,7 @@ def unmodifySeq(seq, sequenceMotif):
         seq = re.sub(pattern[:i] + "$", sub[:i], seq)
     # now replace in the middle
     seq = seq.replace(pattern,sub)
-    return Seq.Seq(seq) if returnBioSeq else seq
+    return Seq.Seq(seq) if converted else seq
 
 def getSeqDiff(s1, s2):
     """
