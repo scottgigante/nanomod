@@ -238,7 +238,7 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
                     skip = True
                     continue
 
-                outfile = getOutfile(fast5Name, options)
+                outfile = getOutfile(fast5Name, options.outPrefix)
                 filename = os.path.join(options.tempDir, fast5Name)
                 if preventOverwrite(outfile, options.force):
                     skip=True
