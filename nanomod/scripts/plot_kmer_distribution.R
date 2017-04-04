@@ -15,7 +15,6 @@ dataset = dataset[sample(length(dataset), num_files)]
 
 # read file
 output_per_file = sapply(dataset, FUN = function(f) {
-  aligned_df = tryCatch({
   original_df = h5read(f, original_group)
   new_df = h5read(f, new_group)
   
@@ -45,10 +44,9 @@ output_per_file = sapply(dataset, FUN = function(f) {
     MAD = median(abs(med - raw))
     aligned_df$new_mean = (aligned_df$original_mean - med)/MAD
     aligned_df$filename = f
-    aligned_df
   } else {
-    matrix(ncol=0, nrow=0)}
-  }}, error=function(x){matrix(ncol=0, nrow=0)})
+    aligned_df = matrix(ncol=0, nrow=0)
+  }
   t(aligned_df)
 })
 

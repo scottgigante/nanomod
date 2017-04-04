@@ -104,7 +104,7 @@ def multithreadPoretools(poretools, tempDir, force, reads, output, readLength=20
                 for line in infile:
                     outfile.write(line)
 
-def buildSortedBam(threads, genome, fastaFile, outPrefix, force, mapq=30, noSupplementary=False):
+def buildSortedBam(threads, genome, fastaFile, outPrefix, force, mapq=30):
     """
     Build an indexed sorted bam from a fasta file.
 
@@ -120,7 +120,7 @@ def buildSortedBam(threads, genome, fastaFile, outPrefix, force, mapq=30, noSupp
     sortedBamFile = "{}.sorted.bam".format(outPrefix)
 
     if not preventOverwrite(sortedBamFile, force):
-        sam = callPopen('{} mem -x ont2d -t {} -T {} {} {} {}'.format(__exe__['bwa'], threads, mapq, '-M' if noSupplementary else '', genome, fastaFile).split(), stdout=subprocess.PIPE)
+        sam = callPopen('{} mem -x ont2d -t {} -T {} {} {}'.format(__exe__['bwa'], threads, mapq, genome, fastaFile).split(), stdout=subprocess.PIPE)
         callSubProcess('samtools sort -o {} -O bam -@ {} -T nanomod -'.format(sortedBamFile, threads), force, stdin=sam.stdout, newFile = sortedBamFile)
 
         callSubProcess('{} index {}'.format(__exe__['samtools'], sortedBamFile),
@@ -182,7 +182,7 @@ def buildEventalign(options, reads, outPrefix):
             options.force, newFile="{}.bwt".format(options.genome))
 
     # build sorted bam file using bwa mem
-    sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, outPrefix, options.force, options.mappingQuality, True)
+    sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, outPrefix, options.force, options.mappingQuality)
     mappedCount = bamReadCount(sortedBamFile)
     fast5Count= int(find_reads.communicate()[0])
     readProp = float(mappedCount) / fast5Count
