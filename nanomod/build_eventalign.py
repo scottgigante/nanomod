@@ -122,7 +122,7 @@ def buildSortedBam(threads, genome, fastaFile, outPrefix, force, mapq=30):
     if not preventOverwrite(sortedBamFile, force):
         sam = callPopen('{} mem -x ont2d -t {} -T {} {} {}'.format(__exe__['bwa'], threads, mapq, genome, fastaFile).split(), stdout=subprocess.PIPE)
         callSubProcess('samtools sort -o {} -O bam -@ {} -T nanomod -'.format(sortedBamFile, threads), force, stdin=sam.stdout, newFile = sortedBamFile)
-
+        sam.stdout.close()
         callSubProcess('{} index {}'.format(__exe__['samtools'], sortedBamFile),
                 force, newFile="{}.bai".format(sortedBamFile))
 
