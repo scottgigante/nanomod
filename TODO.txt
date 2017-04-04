@@ -14,25 +14,23 @@ nanomod/scripts/build_eventalign_from_simulation.py:21: add options for 1D, 1D t
 nanomod/scripts/build_eventalign_from_simulation.py:198: include CGIs?
 nanomod/scripts/build_eventalign_from_simulation.py:311: what about reverse reads?
 nanomod/scripts/select_data_fraction.sh:29: Allow one or both input files to be empty. 
-nanomod/scripts/select_data_fraction.sh:30: Allow a random seed / just take head instead of shuf 
 nanomod/embed_eventalign.py:21: deal with secondary / auxiliary reads better 
-nanomod/embed_eventalign.py:56: remove dependence on options
-nanomod/embed_eventalign.py:87: we do this twice - make this into a routine.
-nanomod/embed_eventalign.py:88: maybe swap to nanoraw instead of eventalign
-nanomod/embed_eventalign.py:91: med = np.median(raw) pull sample rate from uniqueglobalkey
-nanomod/embed_eventalign.py:105: if the read fails QC, should we just move on?
-nanomod/embed_eventalign.py:324: can we exclude fail reads earlier to save time?
-nanomod/embed_eventalign.py:372: can we do this without reopening?
-nanomod/embed_eventalign.py:400: remove dependence on options
+nanomod/embed_eventalign.py:85: we do this twice - make this into a routine.
+nanomod/embed_eventalign.py:86: maybe swap to nanoraw instead of eventalign
+nanomod/embed_eventalign.py:89: med = np.median(raw) pull sample rate from uniqueglobalkey
+nanomod/embed_eventalign.py:103: if the read fails QC, should we just move on?
+nanomod/embed_eventalign.py:322: can we exclude fail reads earlier to save time?
+nanomod/embed_eventalign.py:370: can we do this without reopening?
+nanomod/embed_eventalign.py:398: remove dependence on options
 nanomod/utils.py:88: fix this automatically - maybe a --check-dependencies option?
 nanomod/utils.py:97: can we move away from shell calls?
 nanomod/utils.py:118: out=sys.stdout can we send this to logging?
 nanomod/utils.py:128: fix this automatically - maybe a --check-dependencies option?
-nanomod/train_nanomod.py:107: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
+nanomod/train_nanomod.py:108: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
 nanomod/parse_args.py:133: "(required)")) include in model?
 nanomod/parse_args.py:140: dest="force", help="Force recreation of extant files") make this ranked? eg force 1, force 8?
 nanomod/parse_args.py:143: help="do not apply median normalization before run") can we infer this?
-nanomod/parse_args.py:169: parser.add_argument("--chemistry", default="r9") can we infer this?
+nanomod/parse_args.py:170: parser.add_argument("--chemistry", default="r9") can we infer this?
 nanomod/pickle_to_currennt.py:272: why bias 1?
 nanomod/pickle_to_currennt.py:337: don't need to pass options to this function
 nanomod/train_nanonet.py:39: what should we return? can we try running nanonet?

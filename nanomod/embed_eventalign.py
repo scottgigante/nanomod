@@ -44,7 +44,7 @@ from check_skip_stay_prob import getSkipStayConstraints
 
 __max_read_len__ = 1000000
 
-def getOutfile(fast5, options):
+def getOutfile(fast5, outPrefix):
     """
     Get the path of the output file corresponding to a fast5 file.
 
@@ -52,10 +52,8 @@ def getOutfile(fast5, options):
     :param options: Namespace object from argparse
 
     :returns: Relative path to output fast5 file
-
-    TODO: remove dependence on options
     """
-    return os.path.join(options.outPrefix, fast5)
+    return os.path.join(outPrefix, fast5)
 
 def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
         chromosome, forward, numSkips, numStays, readLength, kmer, genome):
@@ -98,7 +96,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
     events = events[events["kmer"] != 'X'*kmer]
 
     filename = fast5Path.split('/')[-1]
-    newPath = getOutfile(filename, options)
+    newPath = getOutfile(filename, options.outPrefix)
     copyfile(fast5Path, newPath)
     logging.debug("Saving {}".format(filename))
     with h5py.File(newPath,'r+') as fast5:
@@ -400,7 +398,7 @@ def checkPremade(options, filename):
     TODO: remove dependence on options
     """
     try:
-        with h5py.File(getOutfile(filename, options), 'r') as fh:
+        with h5py.File(getOutfile(filename, options.outPrefix), 'r') as fh:
             attrs = fh.get(("Analyses/Basecall_1D_000/Summary/basecall_1d"
                     "_template")).attrs
             numEvents = float(attrs["called_events"])
@@ -446,7 +444,7 @@ def writeTrainfiles(options, trainData, outPrefix):
             if filename in seenFiles:
                 continue
             seenFiles.add(filename)
-            if os.path.isfile(getOutfile(filename, options)):
+            if os.path.isfile(getOutfile(filename, options.outPrefix)):
                 if np.random.rand() > options.valFraction:
                     logging.debug("Training set{}: {}".format(" - Selected" if pass_quality else "", filename))
                     trainFile.write(filename + "\n")
