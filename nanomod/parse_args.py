@@ -144,7 +144,8 @@ def addCommonArgs(parser):
     parser.add_argument("-t", "--threads", type=int, default=cpu_count(),
             dest="threads",
             help="Number of threads to be used in multiprocessing")
-    parser.add_argument("--seed", type=int, default=None, help="Random seed for read selection.")
+    parser.add_argument("--seed", type=int, default=None,
+            help="Random seed for read selection.")
     return parser
 
 def addCallArgs(parser):

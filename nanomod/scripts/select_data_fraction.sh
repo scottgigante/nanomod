@@ -27,7 +27,6 @@
 # @return $3.small The reduced validation output file                          #
 #                                                                              #
 # TODO: Allow one or both input files to be empty.                             #
-# TODO: Allow a random seed / just take head instead of shuf                   #
 #                                                                              #
 # Author: Scott Gigante                                                        #
 # Contact: gigante.s@wehi.edu.au                                               #
@@ -39,6 +38,19 @@
 FRAC=$1
 TRAIN_IN=$2
 VAL_IN=$3
+
+# random seed function
+if [ "$#" -gt 3 ]; then
+  get_seeded_random()
+  {
+    seed="$1"
+    openssl enc -aes-256-ctr -pass pass:"$seed" -nosalt \
+      </dev/zero 2>/dev/null
+  }
+  SHUF="shuf -i1-100 --random-source=<(get_seeded_random $4))"
+else
+  SHUF="shuf"
+fi
 
 TRAIN_OUT="$TRAIN_IN.small"
 VAL_OUT="$VAL_IN.small"
@@ -56,5 +68,5 @@ head -n 1 $TRAIN_IN > $TRAIN_OUT
 head -n 1 $VAL_IN > $VAL_OUT
 
 # random selection
-tail -n +2 $TRAIN_IN | shuf -n $TRAIN_FRAC - >> $TRAIN_OUT
-tail -n +2 $VAL_IN | shuf -n $VAL_FRAC - >> $VAL_OUT
+tail -n +2 $TRAIN_IN | $SHUF -n $TRAIN_FRAC - >> $TRAIN_OUT
+tail -n +2 $VAL_IN | $SHUF -n $VAL_FRAC - >> $VAL_OUT

@@ -64,8 +64,9 @@ def buildTrainingSet(options, reads, outPrefix, modified=False):
     if "random" in options.selectMode:
         # overwrite small training sets with random selection
         callSubProcess(("./nanomod/scripts/select_data_fraction.sh {0} "
-                "{1}.train.txt {1}.val.txt").format(options.dataFraction,
-                outPrefix), options.force)
+                "{1}.train.txt {1}.val.txt {2}").format(options.dataFraction,
+                outPrefix, options.seed if options.seed is not None else ""),
+                options.force)
 
 def combineTrainingSets(options, t1, t2, outPrefix):
     """
