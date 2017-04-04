@@ -116,18 +116,18 @@ def loadRef(fasta):
     handle.close()
     return refs
 
-def loadGenome(genome, sequenceMotif, modified=False):
+def loadGenome(genomeFile, sequenceMotif, modified=False):
     """
     Load a reference genome and store modified and reversed copies
 
-    :param genome: string Path to genome fasta file
+    :param genomeFile: string Path to genome fasta file
     :param sequenceMotif: Two-element array of strings, canonical motif, modified motif
     :param modified: Boolean, whether or not the sequence is modified
 
     :returns: dictionary of dictionaries, each of which contains a SeqIO record, forward (perhaps modified) sequence and reversed sequence corresponding to each contig of reference
     """
     genome = {}
-    with open(genome, "rU") as handle:
+    with open(genomeFile, "rU") as handle:
         for record in SeqIO.parse(handle, "fasta"):
             contig = { 'id' : record.id }
             reverseSeq = Seq.reverse_complement(record.seq)
