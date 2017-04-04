@@ -45,7 +45,7 @@ def getBayesPercentage(numMods, numUnmods, alpha):
     :param numUnmods: int Number of reads observed as unmodified at this site
     :param alpha: Hyperparameter for beta prior
     """
-    # TODO: can we use coverage vs. numMods + numUnmods to get a clever value for alpha?
+    # TODO: implement glm solution instead
     return float(numMods + alpha)/(numMods + numUnmods + alpha)
 
 def checkModifiedPositions(options):
@@ -183,7 +183,6 @@ def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, 
     if refPos in modPositions[refName]['+']:
         checkFwd = True
     if (-refPos-1+len(genome)) in modPositions[refName]['-']:
-        # TODO: we have 345000 sites when we should have double that - is reverse working?
         checkReverse = True
     if not (checkFwd or checkReverse):
         # ref genome is not modified here
