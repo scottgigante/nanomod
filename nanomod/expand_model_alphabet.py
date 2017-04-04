@@ -166,7 +166,7 @@ def getInKmerLen(inNetwork, alphabet=__canonical__):
 
     return kmerLen
 
-def run(inFilename, outFilename, outKmerLen, sequenceMotif=["",""], force=True):
+def expandModelAlphabet(inFilename, outFilename, outKmerLen, sequenceMotif=["",""], force=True):
     """
     Expand nanonet model file to include all possible outputs from an expanded model
 
@@ -185,17 +185,6 @@ def run(inFilename, outFilename, outKmerLen, sequenceMotif=["",""], force=True):
             sequenceMotif)
     outNetwork = createExpandedNetwork(inNetwork, kmers, reverseMap)
     saveJson(outFilename, outNetwork)
-
-def expandModelAlphabet(options):
-    """
-    Expand nanonet model file to include all possible outputs from an expanded model
-
-    :param options: Namespace object from argparse
-
-    # TODO: remove dependence on argparse options
-    """
-    run(options.currenntTemplate, options.expandedTemplate, options.kmer,
-            options.sequenceMotif, options.force)
 
 if __name__ == "__main__":
     """

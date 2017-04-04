@@ -4,14 +4,11 @@ nanomod/index_modifications.py:59: should we avoid overwrite here? would have to
 nanomod/call_nanomod.py:85: does nanonetcall use raw signal or event data?
 nanomod/call_nanomod.py:87: we do this twice - make this into a routine.
 nanomod/call_nanomod.py:136: specify dtype
-nanomod/summarise_modifications.py:48: can we use coverage vs. numMods + numUnmods to get a clever value for alpha?
+nanomod/summarise_modifications.py:48: implement glm solution instead
 nanomod/summarise_modifications.py:60: can we remove dependence on options here?
 nanomod/summarise_modifications.py:89: check that this checks the correct position
-nanomod/summarise_modifications.py:186: we have 345000 sites when we should have double that - is reverse working?
-nanomod/summarise_modifications.py:335: use consistent output for window of 1 and window of X
-nanomod/nanonetcall.py:493: handle case where there are pre-existing files.
+nanomod/summarise_modifications.py:334: use consistent output for window of 1 and window of X
 nanomod/expand_model_alphabet.py:51: should we randomly initialise (rather than zero) for nonexistent kmers?
-nanomod/expand_model_alphabet.py:195: remove dependence on argparse options
 nanomod/scripts/create_serial_net.py:22: use argparse 
 nanomod/scripts/build_eventalign_from_simulation.py:21: add options for 1D, 1D template only, 2D 
 nanomod/scripts/build_eventalign_from_simulation.py:198: include CGIs?
@@ -32,10 +29,10 @@ nanomod/utils.py:97: can we move away from shell calls?
 nanomod/utils.py:118: out=sys.stdout can we send this to logging?
 nanomod/utils.py:128: fix this automatically - maybe a --check-dependencies option?
 nanomod/train_nanomod.py:107: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
-nanomod/parse_args.py:132: "(required)")) include in model?
-nanomod/parse_args.py:139: dest="force", help="Force recreation of extant files") make this ranked? eg force 1, force 8?
-nanomod/parse_args.py:142: help="do not apply median normalization before run") can we infer this?
-nanomod/parse_args.py:168: parser.add_argument("--chemistry", default="r9") can we infer this?
+nanomod/parse_args.py:133: "(required)")) include in model?
+nanomod/parse_args.py:140: dest="force", help="Force recreation of extant files") make this ranked? eg force 1, force 8?
+nanomod/parse_args.py:143: help="do not apply median normalization before run") can we infer this?
+nanomod/parse_args.py:169: parser.add_argument("--chemistry", default="r9") can we infer this?
 nanomod/pickle_to_currennt.py:272: why bias 1?
 nanomod/pickle_to_currennt.py:337: don't need to pass options to this function
 nanomod/train_nanonet.py:39: what should we return? can we try running nanonet?

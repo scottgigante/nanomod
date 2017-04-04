@@ -85,7 +85,8 @@ def initialiseTrainArgs(options):
 
     # expand model to include modifications
     options.expandedTemplate = "{}.mod.json".format(options.nanonetTemplate)
-    expandModelAlphabet(options)
+    expandModelAlphabet(options.currenntTemplate, options.expandedTemplate, options.kmer,
+            options.sequenceMotif, options.force)
 
 def initialiseArgs(command, options):
     """
