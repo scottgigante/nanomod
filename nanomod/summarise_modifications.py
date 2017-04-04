@@ -60,8 +60,8 @@ def checkModifiedPositions(options):
     TODO: can we remove dependence on options here?
     """
     modPositions = dict()
-    canonGenome = loadGenome(options)
-    modGenome = loadGenome(options, modified=True)
+    canonGenome = loadGenome(options.genome, options.sequenceMotif)
+    modGenome = loadGenome(options.genome, options.sequenceMotif, modified=True)
     for contig in canonGenome:
         modPositions[contig] = dict()
         modPositions[contig]['+'] = getSeqDiff(

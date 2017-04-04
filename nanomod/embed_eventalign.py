@@ -507,7 +507,7 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
 
     logging.info("Loading fast5 names and references...")
     refs = loadRef(fasta)
-    genome = loadGenome(options, modified)
+    genome = loadGenome(options.genome, options.sequenceMotif, modified)
 
     if "random" in options.selectMode:
         # no point populating constrained files, we will overwrite later

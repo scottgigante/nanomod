@@ -33,7 +33,6 @@ import os
 from utils import callSubProcess, configureLog
 from index_modifications import indexAndCleanModifications
 from summarise_modifications import countModifications
-from seq_tools import loadGenome
 from shutil import copyfile
 from build_eventalign import buildSortedBam
 from . import __exe__
