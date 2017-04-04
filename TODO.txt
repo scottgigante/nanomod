@@ -1,12 +1,9 @@
 nanomod/seq_tools.py:20: include wildcard expansion 
 nanomod/seq_tools.py:60: implement wildcard expansion
-nanomod/seq_tools.py:195: we do this twice - make it a method?
-Binary file nanomod/embed_eventalign.pyc matches
 nanomod/index_modifications.py:59: should we avoid overwrite here? would have to reload fasta
 nanomod/call_nanomod.py:85: does nanonetcall use raw signal or event data?
 nanomod/call_nanomod.py:87: we do this twice - make this into a routine.
 nanomod/call_nanomod.py:136: specify dtype
-Binary file nanomod/utils.pyc matches
 nanomod/summarise_modifications.py:48: can we use coverage vs. numMods + numUnmods to get a clever value for alpha?
 nanomod/summarise_modifications.py:60: can we remove dependence on options here?
 nanomod/summarise_modifications.py:89: check that this checks the correct position
@@ -15,14 +12,12 @@ nanomod/summarise_modifications.py:335: use consistent output for window of 1 an
 nanomod/nanonetcall.py:493: handle case where there are pre-existing files.
 nanomod/expand_model_alphabet.py:51: should we randomly initialise (rather than zero) for nonexistent kmers?
 nanomod/expand_model_alphabet.py:195: remove dependence on argparse options
-Binary file nanomod/call_nanomod.pyc matches
 nanomod/scripts/create_serial_net.py:22: use argparse 
 nanomod/scripts/build_eventalign_from_simulation.py:21: add options for 1D, 1D template only, 2D 
 nanomod/scripts/build_eventalign_from_simulation.py:198: include CGIs?
 nanomod/scripts/build_eventalign_from_simulation.py:311: what about reverse reads?
 nanomod/scripts/select_data_fraction.sh:29: Allow one or both input files to be empty. 
 nanomod/scripts/select_data_fraction.sh:30: Allow a random seed / just take head instead of shuf 
-Binary file nanomod/build_eventalign.pyc matches
 nanomod/embed_eventalign.py:21: deal with secondary / auxiliary reads better 
 nanomod/embed_eventalign.py:56: remove dependence on options
 nanomod/embed_eventalign.py:87: we do this twice - make this into a routine.
@@ -32,23 +27,18 @@ nanomod/embed_eventalign.py:105: if the read fails QC, should we just move on?
 nanomod/embed_eventalign.py:324: can we exclude fail reads earlier to save time?
 nanomod/embed_eventalign.py:372: can we do this without reopening?
 nanomod/embed_eventalign.py:400: remove dependence on options
-Binary file nanomod/pickle_to_currennt.pyc matches
 nanomod/utils.py:88: fix this automatically - maybe a --check-dependencies option?
 nanomod/utils.py:97: can we move away from shell calls?
 nanomod/utils.py:118: out=sys.stdout can we send this to logging?
 nanomod/utils.py:128: fix this automatically - maybe a --check-dependencies option?
 nanomod/train_nanomod.py:107: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
-Binary file nanomod/seq_tools.pyc matches
 nanomod/parse_args.py:132: "(required)")) include in model?
 nanomod/parse_args.py:139: dest="force", help="Force recreation of extant files") make this ranked? eg force 1, force 8?
 nanomod/parse_args.py:142: help="do not apply median normalization before run") can we infer this?
 nanomod/parse_args.py:168: parser.add_argument("--chemistry", default="r9") can we infer this?
-Binary file nanomod/expand_model_alphabet.pyc matches
 nanomod/pickle_to_currennt.py:272: why bias 1?
 nanomod/pickle_to_currennt.py:337: don't need to pass options to this function
-Binary file nanomod/summarise_modifications.pyc matches
 nanomod/train_nanonet.py:39: what should we return? can we try running nanonet?
-Binary file nanomod/train_nanonet.pyc matches
 nanomod/check_skip_stay_prob.py:20: add method to check bounds given desired proportion 
 nanomod/check_skip_stay_prob.py:51: print "Failed to open {}".format(filename) use logging here
 nanomod/build_eventalign.py:79: why can't this handle more than eight cores? Arbitrary.
