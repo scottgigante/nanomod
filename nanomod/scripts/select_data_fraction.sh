@@ -47,9 +47,9 @@ if [ "$#" -gt 3 ]; then
     openssl enc -aes-256-ctr -pass pass:"$seed" -nosalt \
       </dev/zero 2>/dev/null
   }
-  SHUF="shuf -i1-100 --random-source=<(get_seeded_random $4))"
+  SHUF='shuf --random-source=<(get_seeded_random $4)'
 else
-  SHUF="shuf"
+  SHUF='shuf'
 fi
 
 TRAIN_OUT="$TRAIN_IN.small"
