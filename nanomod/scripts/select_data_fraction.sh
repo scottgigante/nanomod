@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ################################################################################
 #                                                                              #
 # This file is part of Nanomod.                                                #
@@ -38,19 +40,21 @@
 FRAC=$1
 TRAIN_IN=$2
 VAL_IN=$3
-SEEDNUM=$4
+SEED=$4
 
 # random seed function
+get_seeded_random()
+{
+seed="$1"
+openssl enc -aes-256-ctr -pass pass:"$seed" -nosalt \
+  </dev/zero 2>/dev/null
+}
+
+#choose shuf function
 if [ "$#" -gt 3 ]; then
-  get_seeded_random()
-  {
-    seed="$1"
-    openssl enc -aes-256-ctr -pass pass:"$seed" -nosalt \
-      </dev/zero 2>/dev/null
-  }
-  SHUF=('shuf' '--random-source=<(get_seeded_random ${SEEDNUM})')
+  SHUF=('shuf' '--random-source=<(get_seeded_random ${SEED})')
 else
-  SEED='shuf'
+  SHUF='shuf'
 fi
 
 TRAIN_OUT="$TRAIN_IN.small"
