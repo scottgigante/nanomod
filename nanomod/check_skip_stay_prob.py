@@ -99,7 +99,7 @@ def selectBestReads(dir, proportion, mode=__modes__, threads=1, readLength=2000)
             if "qscore" in mode:
                 deviations.append((qscoreMean - read[3])/qscoreStdv)
             cutoffs.append([filename, np.mean(deviations)])
-    cutoffs = sorted(cutoffs, key=itemgetter(1), reverse=True)
+    cutoffs = sorted(cutoffs, key=itemgetter(1))
 
     bestFiles = list(map(itemgetter(0), cutoffs))
 
