@@ -68,5 +68,5 @@ head -n 1 $TRAIN_IN > $TRAIN_OUT
 head -n 1 $VAL_IN > $VAL_OUT
 
 # random selection
-tail -n +2 $TRAIN_IN | $SHUF -n $TRAIN_FRAC - >> $TRAIN_OUT
-tail -n +2 $VAL_IN | $SHUF -n $VAL_FRAC - >> $VAL_OUT
+tail -n +2 $TRAIN_IN | $SHUF -n $TRAIN_FRAC >> $TRAIN_OUT
+tail -n +2 $VAL_IN | $SHUF -n $VAL_FRAC >> $VAL_OUT
