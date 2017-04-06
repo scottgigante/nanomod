@@ -48,7 +48,6 @@ def generateKmers(inAlpha, outAlpha, inKmerLen, outKmerLen, sequenceMotif):
     :returns outKmers: array of strings, all kmers in new model
     :returns reverseMap: dictionary linking new kmer indices to original kmer strings where they exist, and None otherwise
 
-    TODO: should we randomly initialise (rather than zero) for nonexistent kmers?
     """
 
     # generate original kmers
@@ -77,6 +76,9 @@ def generateKmers(inAlpha, outAlpha, inKmerLen, outKmerLen, sequenceMotif):
             for inKmer in inKmersMap.keys():
                 if inKmer[start:end] == k:
                     reverseMap[i].append(inKmersMap[inKmer])
+            if reverseMap[i] == []:
+                pass
+                # TODO: should we randomly initialise (rather than zero) for nonexistent kmers?
     elif inKmerLen < outKmerLen:
         raise ValueError("Cannot build model with longer kmers than input model")
     else:
@@ -85,6 +87,9 @@ def generateKmers(inAlpha, outAlpha, inKmerLen, outKmerLen, sequenceMotif):
             reverseMap[i] = []
             if inKmersMap.has_key(k):
                 reverseMap[i].append(inKmersMap[k])
+            else:
+                pass
+                # TODO: should we randomly initialise (rather than zero) for nonexistent kmers?
     return outKmers, reverseMap
 
 def createExpandedNetwork(inNetwork, kmers, reverseMap):
