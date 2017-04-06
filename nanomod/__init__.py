@@ -43,7 +43,7 @@ __prognames__ = { 'train' : [
                       'nanonetcall'
                       ] }
 __config__ = "config.json"
-__modes__ = ["skip", "stay", "step"]
+__modes__ = ["skip", "stay", "step", "qscore"]
 
 # define path to an executable in global dictionary
 #

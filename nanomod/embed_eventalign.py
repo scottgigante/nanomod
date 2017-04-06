@@ -40,7 +40,6 @@ from shutil import copyfile
 
 from seq_tools import *
 from utils import makeDir, multiprocessWrapper, preventOverwrite
-from check_skip_stay_prob import getSkipStayConstraints
 
 __max_read_len__ = 1000000
 
@@ -100,18 +99,6 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
     copyfile(fast5Path, newPath)
     logging.debug("Saving {}".format(filename))
     with h5py.File(newPath,'r+') as fast5:
-        # TODO: if the read fails QC, should we just move on?
-        attrs = fast5.get(("Analyses/Basecall_1D_000/Summary/basecall_1d"
-                "_template")).attrs
-        numEvents = float(attrs["called_events"])
-        skipProb = attrs["num_skips"]/numEvents
-        stayProb = attrs["num_stays"]/numEvents
-        stepProb = 1-skipProb-stayProb
-        readLength = attrs["sequence_length"]
-        passQuality = (skipProb < options.constraints['maxSkips'] and
-                stayProb < options.constraints['maxStays'] and
-                stepProb > options.constraints['minSteps'] and
-                readLength >= options.readLength)
 
         analysesGroup = fast5.get("Analyses")
         alignToRefGroup = analysesGroup.create_group("AlignToRef")
@@ -122,6 +109,10 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
         eventsGroup.create_dataset("Events", data=events)
 
         # create attrs
+        numEvents = events.shape[0]
+        skipProb = float(numSkips) / numEvents
+        stayProb = float(numStays) / numEvents
+        stepProb = 1-skipProb - stayProb
         summaryGroup = alignToRefGroup.create_group("Summary")
         attrsGroup = summaryGroup.create_group("current_space_map_template")
         attrs = attrsGroup.attrs
@@ -150,7 +141,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
         attrs = attrsGroup.attrs
         attrs.create("genome", chromosome)
 
-    return passQuality
+    return 0
 
 def processEventalignWorker(options, eventalign, refs, idx, numReads, start, stop, genome, modified, kmer, alphabet):
     """fast5Path, genome, modified, kmer, alphabet
@@ -180,7 +171,6 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
         started=False if start > 0 else True
         events=None
         filenames = set()
-        trainData = list()
         premadeFilenames = set()
         n=0
 
@@ -202,10 +192,9 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
                 #########################
                 if events is not None:
                     try:
-                        passQuality = writeFast5(options, events, fast5Path,
+                        writeFast5(options, events, fast5Path,
                             initial_ref_index, last_ref_index, chromosome, forward,
                             numSkips, numStays, readLength, kmer, genome)
-                        trainData.append([fast5Name, passQuality])
                         filenames.add(fast5Name)
                         events = None
                         n += 1
@@ -276,7 +265,6 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
                 seq_pos = None
                 last_seq_pos = None
 
-                filenames.add(fast5Path)
                 skip=False
 
             ########################
@@ -322,15 +310,15 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
         # TODO: can we exclude fail reads earlier to save time?
         if events is not None:
             try:
-                passQuality = writeFast5(options, events, fast5Path,
+                writeFast5(options, events, fast5Path,
                     initial_ref_index, last_ref_index, chromosome, forward,
                     numSkips, numStays, readLength, kmer, genome)
-                trainData.append([fast5Name, passQuality])
+                filenames.add(fast5Name)
             except Exception as e:
-                logging.warning("Failed to save {}.".format(fast5File))
+                logging.warning("Failed to save {}.".format(fast5Name))
                 logging.warning(str(e))
 
-    return trainData, premadeFilenames
+    return itertools.chain(filenames, premadeFilenames)
 
 def processEventalign(options, eventalign, refs, genome, modified, alphabet):
     """
@@ -383,43 +371,12 @@ def processEventalign(options, eventalign, refs, genome, modified, alphabet):
                 [[options, eventalign, refs, idx, -1, splitRange[i+1], splitRange[i], genome, modified, kmer, alphabet] for i in range(len(splitRange)-1)])
         pool.close()
         pool.join()
-        trainData, premadeFilenames = tuple(itertools.chain(*i) for i in itertools.izip(*data))
+        filenames = itertools.chain.from_iterable(data)
     else:
-        trainData, premadeFilenames = processEventalignWorker(options, eventalign, refs, idx, options.numReads, 0, None, genome, modified, kmer, alphabet)
-    return trainData, premadeFilenames
+        filenames = processEventalignWorker(options, eventalign, refs, idx, options.numReads, 0, None, genome, modified, kmer, alphabet)
+    return filenames
 
-def checkPremade(options, filename):
-    """
-    Check quality of fast5 files generated in previous runs of nanomod
-
-    :param options: Namespace object from argparse
-    :param filename: Name of premade fast5 file
-
-    TODO: remove dependence on options
-    """
-    try:
-        with h5py.File(getOutfile(filename, options.outPrefix), 'r') as fh:
-            attrs = fh.get(("Analyses/Basecall_1D_000/Summary/basecall_1d"
-                    "_template")).attrs
-            numEvents = float(attrs["called_events"])
-            skipProb = attrs["num_skips"]/numEvents
-            stayProb = attrs["num_stays"]/numEvents
-            stepProb = 1-skipProb-stayProb
-            readLength = attrs["sequence_length"]
-            passQuality = (skipProb < options.constraints['maxSkips'] and
-                    stayProb < options.constraints['maxStays'] and
-                    stepProb > options.constraints['minSteps'] and
-                    readLength >= options.readLength)
-    except IOError:
-        logging.warning("Failed to read {}".format(filename))
-        passQuality = False
-    except AttributeError:
-        # can't find attributes
-        logging.info("Attributes missing on {}".format(filename))
-        passQuality = False
-    return [filename, passQuality]
-
-def writeTrainfiles(options, trainData, outPrefix):
+def writeTrainfiles(options, filenames, outPrefix):
     """
     Write text files for training and validation consisting of fast5 basenames
 
@@ -437,24 +394,18 @@ def writeTrainfiles(options, trainData, outPrefix):
         # write trainFile / valFile headers
         trainFile.write("#filename\n")
         valFile.write("#filename\n")
-        smallTrainFile.write("#filename\n")
-        smallValFile.write("#filename\n")
 
-        for filename, pass_quality in trainData:
+        for filename in filenames:
             if filename in seenFiles:
                 continue
             seenFiles.add(filename)
             if os.path.isfile(getOutfile(filename, options.outPrefix)):
                 if np.random.rand() > options.valFraction:
-                    logging.debug("Training set{}: {}".format(" - Selected" if pass_quality else "", filename))
+                    logging.debug("Training set: {}".format(filename))
                     trainFile.write(filename + "\n")
-                    if pass_quality:
-                        smallTrainFile.write(filename + "\n")
                 else:
-                    logging.debug("Validation set{}: {}".format(" - Selected" if pass_quality else "", filename))
+                    logging.debug("Validation set: {}".format(filename))
                     valFile.write(filename + "\n")
-                    if pass_quality:
-                        smallValFile.write(filename + "\n")
 
 def processReadWrapper(args):
     """
@@ -507,27 +458,9 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
     refs = loadRef(fasta)
     genome = loadGenome(options.genome, options.sequenceMotif, modified)
 
-    if "random" in options.selectMode:
-        # no point populating constrained files, we will overwrite later
-        options.constraints = {'maxSkips' : 0,
-            'maxStays' : 0,
-            'minSteps' : 1 }
-    else:
-        logging.info("Calculating skip/stay count constraints...")
-        options.constraints = getSkipStayConstraints(reads,
-                options.dataFraction, options.selectMode, options.readLength)
-        logging.debug(str(options.constraints))
-
     logging.info("Splitting eventalign into separate files...")
     alphabet = expandAlphabet(options.sequenceMotif)
-    trainData, premadeFilenames = processEventalign(options, eventalign, refs, genome, modified, alphabet)
-
-    pool = Pool(options.threads)
-    logging.info("Adding data for premade fast5 files...")
-    itertools.chain(trainData, pool.map(checkPremadeWrapper,
-            [[options, i] for i in premadeFilenames]))
-    pool.close()
-    pool.join()
+    filenames = processEventalign(options, eventalign, refs, genome, modified, alphabet)
 
     logging.info("Saving datasets...")
-    writeTrainfiles(options, trainData, outPrefix)
+    writeTrainfiles(options, filenames, outPrefix)

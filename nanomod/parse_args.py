@@ -88,6 +88,10 @@ def initialiseTrainArgs(options):
     expandModelAlphabet(options.currenntTemplate, options.expandedTemplate, options.kmer,
             options.sequenceMotif, options.force)
 
+    # verify select modes
+    if "random" in options.selectMode and options.selectMode != ["random"]:
+        logging.warning("--select-mode random cannot be used in conjunction with other modes. Using random only.")
+
 def initialiseArgs(command, options):
     """
     Perform various initalisation tasks.
@@ -208,7 +212,7 @@ def addTrainArgs(parser):
             help=("Method for choosing reads to send to nanonet; choose any or"
             " all from random, {}").format(", ".join(__modes__)),
             dest="selectMode")
-    parser.add_argument("--read-length", default=2000, type=int,
+    parser.add_argument("--read-length", default=5000, type=int,
             dest="readLength", help="Minimum read length for training reads.")
     parser.add_argument("--mapping-quality", default=60, type=int,
             dest="mappingQuality", help="Minimum mapping quality for training reads.")

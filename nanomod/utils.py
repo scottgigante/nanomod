@@ -68,7 +68,7 @@ def preventOverwrite(file, force, logFunc=None):
             return True
     return False
 
-def callPopen(call, stdin=None, stdout=None, shell=False):
+def callPopen(call, stdin=None, stdout=None, shell=False, force=False, close_fds=True, newFile=None, mode='w'):
     """
     Call subprocess to send output to a pipe
 
@@ -82,14 +82,28 @@ def callPopen(call, stdin=None, stdout=None, shell=False):
         # print call to debug
         logging.info(call if shell else " ".join(call))
 
+        if preventOverwrite(newFile, force):
+            return 1
+
+        if stdout == subprocess.PIPE:
+            pass
+        elif stdout is not None:
+            stdout=open(stdout, mode)
+        elif logging.getLogger().isEnabledFor(logging.DEBUG):
+            stdout=sys.stdout # TODO: can we send this to logging?
+        else:
+            # don't print stdout from subprocess
+            stdout=open(os.devnull, 'w')
+
         p = subprocess.Popen(call, stdin=stdin, stdout=stdout, shell=shell)
+
     except OSError as e:
         logging.warning("OSError: has a dependency changed path? Try deleting nanomod/.*.config.json and try again.")
         # TODO: fix this automatically - maybe a --check-dependencies option?
         raise e
     return p
 
-def callSubProcess(call, force=False, newFile=None, outputFile=None, close_fds=True,
+def callSubProcess(call, force=False, newFile=None, stdout=None, close_fds=True,
         shell=True, stdin=None, mode='w'):
     """
     Call subprocess to create a new file using an external script if the file
@@ -99,34 +113,20 @@ def callSubProcess(call, force=False, newFile=None, outputFile=None, close_fds=T
     :param call: The system call to be run as a string or array_like
     :param: Boolean value, True if we want to overwrite extant files, False otherwise
     :param newFile: File that should be created after run
-    :param outputFile: File to which we shall pipe stdout
-    :param close_fds: Boolean value, close outputFile after writing or not
+    :param stdout: File to which we shall pipe stdout
+    :param close_fds: Boolean value, close stdout after writing or not
     :param shell: Use local shell call - true for string call, false for array_like call
     :param mode: Writing mode: choose from w, wb, a
+
+    # TODO: clean up argument order
     """
-    try:
-        # we should use shell=False to make this more portable
-        # print call to debug
-        logging.info(call if shell else " ".join(call))
 
-        if preventOverwrite(newFile, force):
-            return 1
+    p = callPopen(call, stdin, stdout, shell, force, close_fds, newFile, mode)
+    if p != 1:
+        p.wait()
 
-        if outputFile is not None:
-            out=open(outputFile, mode)
-        elif logging.getLogger().isEnabledFor(logging.DEBUG):
-            out=sys.stdout # TODO: can we send this to logging?
-        else:
-            # don't print stdout from subprocess
-            out=open(os.devnull, 'w')
-        p = subprocess.call(call, stdin=stdin, stdout=out, close_fds=close_fds, shell=shell)
-
-        # check the file was created, if given
-        assert(newFile is None or os.path.isfile(newFile))
-    except OSError as e:
-        logging.warning("OSError: has a dependency changed path? Try deleting nanomod/.*.config.json and try again.")
-        # TODO: fix this automatically - maybe a --check-dependencies option?
-        raise e
+    # check the file was created, if given
+    assert(newFile is None or os.path.isfile(newFile))
     return p
 
 def makeDir(dir):

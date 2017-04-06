@@ -32,6 +32,7 @@ from functools import partial
 import subprocess
 import logging
 import fnmatch
+from check_skip_stay_prob import selectBestReads
 
 from utils import callSubProcess, callPopen, multiprocessWrapper, preventOverwrite
 from . import __exe__
@@ -64,7 +65,7 @@ def callPoretoolsWrapper(args):
     """
     return multiprocessWrapper(callPoretools, args)
 
-def multithreadPoretools(poretools, tempDir, force, reads, output, readLength=2000, filesPerCall=1000):
+def multithreadPoretools(poretools, tempDir, force, files, output, readLength=2000, filesPerCall=1000):
     """
     Runs poretools multithreaded on small chunks of fasta files
 
@@ -82,10 +83,6 @@ def multithreadPoretools(poretools, tempDir, force, reads, output, readLength=20
     if preventOverwrite(output, force):
         return 1
 
-    cwd = os.getcwd()
-    os.chdir(reads)
-    files = [os.path.join(cwd, reads, f) for f in glob.glob("*.fast5")]
-    os.chdir(cwd)
     prefix = [poretools, "fasta", "--type", "fwd", "--min-length", str(readLength)]
 
     calls = [prefix + files[i:i + filesPerCall] for i in xrange(0, len(files),
@@ -157,25 +154,28 @@ def buildEventalign(options, reads, outPrefix):
     """
 
     # check how many files we have to begin with
-    find_reads = subprocess.Popen('find {} -name "*.fast5" | wc -l'.format(reads), stdout=subprocess.PIPE, shell=True)
+    filenames = selectBestReads(reads, options.dataFraction, options.selectMode, options.threads, options.readLength)
 
     fastaFile = '{}.fasta'.format(outPrefix)
     # build fasta using poretools so we have index to fast5 files
     if True:
         try:
             # GNU parallel
-            callSubProcess(('find {} -name "*.fast5" | parallel -j16 -X {} fasta '
-                    '--type fwd --min-length {} $(pwd)/{}').format(reads,
-                    __exe__['poretools'], options.readLength, "{}"), options.force, newFile=fastaFile,
-                    outputFile=fastaFile)
+            poretools = callPopen(('parallel -j16 -X {} fasta '
+                    '--type fwd {}').format(__exe__['poretools'], "{}").split(), force=options.force, stdin=subprocess.PIPE, stdout=fastaFile)
+            poretools.communicate(input='\n'.join(filenames))
+            poretools.wait()
         except Exception:
+            raise
             # something went wrong - are we missing paralle?
             # use our custom multiprocessing script
-            multithreadPoretools(__exe__['poretools'], options.tempDir, options.force, reads, fastaFile, options.readLength)
+            multithreadPoretools(__exe__['poretools'], options.tempDir, options.force, filenames, fastaFile, options.readLength)
     else:
         # single threaded poretools - slow
-        callSubProcess(('{} fasta --type fwd {}').format(__exe__['poretools'],
-                reads), options.force, newFile=fastaFile, outputFile=fastaFile)
+        poretools = callPopen(('{} fasta --type fwd {}').format(__exe__['poretools'],
+                reads), options.force, stdout=fastaFile)
+        poretools.communicate(input='\n'.join(filenames))
+        poretools.wait()
 
     # index genome using bwa
     callSubProcess('{} index {}'.format(__exe__['bwa'], options.genome),
@@ -184,15 +184,13 @@ def buildEventalign(options, reads, outPrefix):
     # build sorted bam file using bwa mem
     sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, outPrefix, options.force, options.mappingQuality)
     mappedCount = bamReadCount(sortedBamFile)
-    fast5Count= int(find_reads.communicate()[0])
-    readProp = float(mappedCount) / fast5Count
-    logging.debug("Mapped {} of {} reads.".format(mappedCount, fast5Count))
+    logging.debug("Mapped {} of {} reads.".format(mappedCount, len(filenames)))
 
     # run nanopolish eventalign
     eventalignFile = "{}.eventalign".format(outPrefix)
     callSubProcess('{} eventalign -t {} --print-read-names -r {} -b {} -g {}'.format(
             __exe__['nanopolish'], options.threads, fastaFile, sortedBamFile,
             options.genome), options.force, newFile=eventalignFile,
-            outputFile=eventalignFile)
+            stdout=eventalignFile)
 
-    return fastaFile, eventalignFile, readProp
+    return fastaFile, eventalignFile

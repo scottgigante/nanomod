@@ -18,6 +18,7 @@
 # check_skip_stay_prob.py:                                                     #
 #                                                                              #
 # TODO: add method to check bounds given desired proportion                    #
+# TODO: include numReads as an alternative to dataFraction
 #                                                                              #
 # Author: Scott Gigante                                                        #
 # Contact: gigante.s@wehi.edu.au                                               #
@@ -28,10 +29,12 @@
 import h5py
 import sys
 import os
+import fnmatch
 import numpy as np
 from multiprocessing import Pool
 import json
 import logging
+from operator import itemgetter
 
 from . import __modes__
 
@@ -43,14 +46,15 @@ def checkProbs(filename):
         with h5py.File(filename, 'r') as fh:
             attrs = fh.get("Analyses/Basecall_1D_000/Summary/basecall_1d_template").attrs
             numEvents = float(attrs["called_events"])
-            skipProb = attrs["num_skips"]/numEvents
-            stayProb = attrs["num_stays"]/numEvents
+            skipProb = float(attrs["num_skips"])/numEvents
+            stayProb = float(attrs["num_stays"])/numEvents
             stepProb = 1-skipProb-stayProb
-            readLength = attrs["sequence_length"]
+            qscore = float(attrs["mean_qscore"])
+            readLength = int(attrs["sequence_length"])
     except IOError:
-        print "Failed to open {}".format(filename) # TODO: use logging here
-        skipProb, stayProb, stepProb, readLength = 1, 1, 0, 0
-    return [skipProb, stayProb, stepProb, readLength]
+        logging.warning("Failed to open {}".format(filename)) # TODO: use logging here
+        skipProb, stayProb, stepProb, qscore = 1, 1, 0, 0, 0
+    return [skipProb, stayProb, stepProb, qscore, readLength]
 
 # get the empirical skip and stay probabilities for a set of reads
 # @param dir The directory to search for fast5 files
@@ -59,41 +63,49 @@ def checkProbs(filename):
 # @return maxSkips
 # @return maxStays
 # @return minSteps
-def getSkipStayConstraints(dir, proportion, mode=__modes__, readLength=2000):
+def selectBestReads(dir, proportion, mode=__modes__, threads=1, readLength=2000):
     for m in mode:
         if m not in __modes__:
             logging.warning("Mode {} not recognised")
-    files = [os.path.join(dir,file) for file in os.listdir(dir) if file.endswith(".fast5")]
+    files = []
+    for root, _, filenames in os.walk(dir):
+        for filename in fnmatch.filter(filenames, '*.fast5'):
+            files.append(os.path.join(root, filename))
+    selectNum = max(int(len(files) * proportion),1)
 
-    p = Pool()
-    probs = np.array(p.map(checkProbs, files)).transpose()
-    probs = probs.transpose()[probs[3] >= readLength].transpose()
+    if "random" in mode:
+        return files[np.random.choice(len(files), selectNum, replace=False)]
+
+    p = Pool(threads)
+    probs = np.array(p.map(checkProbs, files), dtype=np.float32).transpose()
 
     skipMean, skipStdv = getStats(probs[0])
     stayMean, stayStdv = getStats(probs[1])
     stepMean, stepStdv = getStats(probs[2])
+    qscoreMean, qscoreStdv = getStats(probs[3])
 
     cutoffs = []
-    for read in probs.transpose():
-        deviations = []
-        if "skip" in mode:
-            deviations.append((read[0] - skipMean)/skipStdv)
-        if "stay" in mode:
-            deviations.append((read[1] - stayMean)/stayStdv)
-        if "step" in mode:
-            deviations.append((stepMean - read[2])/stepStdv)
-        cutoffs.append(max(deviations))
-    cutoffs.sort()
-    numStdvs = cutoffs[int((len(cutoffs)-1)*proportion)]
-    # want number between 0 and length - 1
+    for i in xrange(len(probs.transpose())):
+        read = probs.transpose()[i]
+        filename = files[i]
+        if read[4] >= readLength:
+            deviations = []
+            if "skip" in mode:
+                deviations.append((read[0] - skipMean)/skipStdv)
+            if "stay" in mode:
+                deviations.append((read[1] - stayMean)/stayStdv)
+            if "step" in mode:
+                deviations.append((stepMean - read[2])/stepStdv)
+            if "qscore" in mode:
+                deviations.append((qscoreMean - read[3])/qscoreStdv)
+            cutoffs.append([filename, np.mean(deviations)])
+    cutoffs = sorted(cutoffs, key=itemgetter(1), reverse=True)
 
-    maxSkips = skipMean + numStdvs * skipStdv
-    maxStays = stayMean + numStdvs * stayStdv
-    minSteps = stepMean - numStdvs * stepStdv
+    bestFiles = list(map(itemgetter(0), cutoffs))
 
-    return {'maxSkips' : maxSkips if "skip" in mode else 1,
-            'maxStays' : maxStays if "stay" in mode else 1,
-            'minSteps' : minSteps if "step" in mode else 0}
-
-if __name__ == "__main__":
-    print getSkipStayConstraints(sys.argv[1], sys.argv[2])
+    if not len(bestFiles) >= selectNum:
+        logging.warning("Insufficient reads of adequate read length. Reducing data fraction to {0:.2f} ({} reads).".format(float(len(bestFiles)) / len(files), selectNum))
+    else:
+        logging.info("Selecting {} reads.".format(selectNum))
+        bestFiles = bestFiles[:selectNum]
+    return bestFiles

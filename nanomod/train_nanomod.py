@@ -56,10 +56,7 @@ def buildTrainingSet(options, reads, outPrefix, modified=False):
     :param reads: Directory for fast5 reads
     :param outPrefix: Prefix for output files
     """
-    fasta, eventalign, readProp = buildEventalign(options, reads, outPrefix)
-    # we've cut out some reads - adjust data fraction
-    options.dataFraction = min(1, options.dataFraction / readProp)
-    logging.debug("Retaining {} of remaining data.".format(options.dataFraction))
+    fasta, eventalign = buildEventalign(options, reads, outPrefix)
     embedEventalign(options, fasta, eventalign, reads, outPrefix, modified)
     if "random" in options.selectMode:
         # overwrite small training sets with random selection
@@ -85,15 +82,15 @@ def combineTrainingSets(options, t1, t2, outPrefix):
     trainFileCombined = "{}.train.txt.small".format(outPrefix)
     valFileCombined = "{}.val.txt.small".format(outPrefix)
     callSubProcess("cat {}".format(trainFile1), options.force,
-            outputFile=trainFileCombined, mode='w')
+            stdout=trainFileCombined, mode='w')
     # skip header second time
     callSubProcess("tail -n +2 {}".format(trainFile2), options.force,
-            outputFile=trainFileCombined, mode='a')
+            stdout=trainFileCombined, mode='a')
     callSubProcess("cat {}".format(valFile1), options.force,
-            outputFile=valFileCombined, mode='w')
+            stdout=valFileCombined, mode='w')
     # skip header second time
     callSubProcess("tail -n +2 {}".format(valFile2), options.force,
-            outputFile=valFileCombined, mode='a')
+            stdout=valFileCombined, mode='a')
 
 def trainNanomod(options):
     """
