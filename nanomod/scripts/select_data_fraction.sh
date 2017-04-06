@@ -38,6 +38,7 @@
 FRAC=$1
 TRAIN_IN=$2
 VAL_IN=$3
+SEEDNUM=$4
 
 # random seed function
 if [ "$#" -gt 3 ]; then
@@ -47,10 +48,9 @@ if [ "$#" -gt 3 ]; then
     openssl enc -aes-256-ctr -pass pass:"$seed" -nosalt \
       </dev/zero 2>/dev/null
   }
-  SEEDNUM=$4
-  SEED='--random-source=<(get_seeded_random $SEEDNUM)'
+  SHUF=('shuf' '--random-source=<(get_seeded_random ${SEEDNUM})')
 else
-  SEED=''
+  SEED='shuf'
 fi
 
 TRAIN_OUT="$TRAIN_IN.small"
@@ -69,5 +69,5 @@ head -n 1 $TRAIN_IN > $TRAIN_OUT
 head -n 1 $VAL_IN > $VAL_OUT
 
 # random selection
-tail -n +2 $TRAIN_IN | shuf $SEED -n $TRAIN_FRAC >> $TRAIN_OUT
-tail -n +2 $VAL_IN | shuf $SEED -n $VAL_FRAC >> $VAL_OUT
+tail -n +2 $TRAIN_IN | $SHUF -n $TRAIN_FRAC >> $TRAIN_OUT
+tail -n +2 $VAL_IN | $SHUF -n $VAL_FRAC >> $VAL_OUT
