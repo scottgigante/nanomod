@@ -154,7 +154,7 @@ def buildEventalign(options, reads, outPrefix):
     """
 
     # check how many files we have to begin with
-    filenames = selectBestReads(reads, options.dataFraction, options.selectMode, options.threads, options.readLength)
+    filenames = selectBestReads(reads, options.dataFraction, options.numReads, options.selectMode, options.threads, options.readLength)
 
     fastaFile = '{}.fasta'.format(outPrefix)
     # build fasta using poretools so we have index to fast5 files
