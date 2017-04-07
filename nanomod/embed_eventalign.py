@@ -407,16 +407,6 @@ def writeTrainfiles(options, filenames, outPrefix):
                     logging.debug("Validation set: {}".format(filename))
                     valFile.write(filename + "\n")
 
-def processReadWrapper(args):
-    """
-    Multiprocessing wrapper for processRead
-
-    :param args: List of arguments for processRead
-
-    :returns: return value from processRead
-    """
-    return multiprocessWrapper(processRead, args)
-
 
 def processEventalignWorkerWrapper(args):
     """
@@ -427,16 +417,6 @@ def processEventalignWorkerWrapper(args):
     :returns: return value from processEventalignWorker
     """
     return multiprocessWrapper(processEventalignWorker, args)
-
-def checkPremadeWrapper(args):
-    """
-    Multiprocessing wrapper for checkPremade
-
-    :param args: List of arguments for checkPremade
-
-    :returns: return value from checkPremade
-    """
-    return multiprocessWrapper(checkPremade, args)
 
 def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
     """
