@@ -308,7 +308,7 @@ def processEventalignWorker(options, eventalign, refs, idx, start, stop, genome,
                 logging.warning("Failed to save {}.".format(fast5Name))
                 logging.warning(str(e))
 
-    return itertools.chain(filenames)
+    return filenames
 
 def processEventalign(options, eventalign, refs, genome, modified, alphabet):
     """
@@ -377,18 +377,14 @@ def writeTrainfiles(options, filenames, outPrefix):
     """
     trainFilename = outPrefix + ".train.txt"
     valFilename = outPrefix + ".val.txt"
-    seenFiles = set()
 
-    with open(trainFilename, 'w') as trainFile, open(valFilename, 'w') as valFile, open(trainFilename + ".small", 'w') as smallTrainFile, open(valFilename + ".small", 'w') as smallValFile:
+    with open(trainFilename, 'w') as trainFile, open(valFilename, 'w') as valFile:
 
         # write trainFile / valFile headers
         trainFile.write("#filename\n")
         valFile.write("#filename\n")
 
-        for filename in filenames:
-            if filename in seenFiles:
-                continue
-            seenFiles.add(filename)
+        for filename in set(filenames):
             if os.path.isfile(getOutfile(filename, options.outPrefix)):
                 if np.random.rand() > options.valFraction:
                     logging.debug("Training set: {}".format(filename))
@@ -396,6 +392,8 @@ def writeTrainfiles(options, filenames, outPrefix):
                 else:
                     logging.debug("Validation set: {}".format(filename))
                     valFile.write(filename + "\n")
+            else:
+                logging.warning("{} not found.".format(filename))
 
 
 def processEventalignWorkerWrapper(args):

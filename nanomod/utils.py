@@ -190,7 +190,7 @@ def recursiveFindFast5(dir):
 
     :returns: list of strings Paths to every fast5 file under dir
     """
-    files = []
+    files = list()
     for root, _, filenames in os.walk(dir):
         for filename in fnmatch.filter(filenames, '*.fast5'):
             files.append(os.path.join(root, filename))
