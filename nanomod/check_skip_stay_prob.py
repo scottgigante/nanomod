@@ -74,6 +74,7 @@ def selectBestReads(dir, proportion, mode=__modes__, threads=1, readLength=2000)
     selectNum = max(int(len(files) * proportion),1)
 
     if "random" in mode:
+        files = np.array(files)
         return files[np.random.choice(len(files), selectNum, replace=False)]
 
     p = Pool(threads)

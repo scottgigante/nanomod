@@ -208,9 +208,9 @@ def addTrainArgs(parser):
             dest="valFraction", help="Fraction of data used for validation set")
     parser.add_argument("--data-fraction", type=float, default=0.1,
             dest="dataFraction", help="Fraction of data to be sent to nanonet")
-    parser.add_argument("--select-mode", default=__modes__, nargs="*",
+    parser.add_argument("--select-mode", choices=tuple(__modes__), default=["skip", "stay", "qscore"], nargs="*",
             help=("Method for choosing reads to send to nanonet; choose any or"
-            " all from random, {}").format(", ".join(__modes__)),
+            " all from {}").format(", ".join(__modes__)),
             dest="selectMode")
     parser.add_argument("--read-length", default=5000, type=int,
             dest="readLength", help="Minimum read length for training reads.")
