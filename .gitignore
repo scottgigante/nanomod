@@ -11,3 +11,4 @@ models/*.json
 build
 dist
 nanomod.egg-info
+sample_data/*.fa.*

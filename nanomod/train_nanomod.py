@@ -58,12 +58,6 @@ def buildTrainingSet(options, reads, outPrefix, modified=False):
     """
     fasta, eventalign = buildEventalign(options, reads, outPrefix)
     embedEventalign(options, fasta, eventalign, reads, outPrefix, modified)
-    if "random" in options.selectMode:
-        # overwrite small training sets with random selection
-        callSubProcess(("./nanomod/scripts/select_data_fraction.sh {0} "
-                "{1}.train.txt {1}.val.txt {2}").format(options.dataFraction,
-                outPrefix, options.seed if options.seed is not None else ""),
-                options.force)
 
 def combineTrainingSets(options, t1, t2, outPrefix):
     """
@@ -75,12 +69,12 @@ def combineTrainingSets(options, t1, t2, outPrefix):
     :param t2: Prefix for training set 2
     :param outPrefix: Prefix for output files
     """
-    trainFile1 = "{}.train.txt.small".format(t1)
-    trainFile2 = "{}.train.txt.small".format(t2)
-    valFile1 = "{}.val.txt.small".format(t1)
-    valFile2 = "{}.val.txt.small".format(t2)
-    trainFileCombined = "{}.train.txt.small".format(outPrefix)
-    valFileCombined = "{}.val.txt.small".format(outPrefix)
+    trainFile1 = "{}.train.txt".format(t1)
+    trainFile2 = "{}.train.txt".format(t2)
+    valFile1 = "{}.val.txt".format(t1)
+    valFile2 = "{}.val.txt".format(t2)
+    trainFileCombined = "{}.train.txt".format(outPrefix)
+    valFileCombined = "{}.val.txt".format(outPrefix)
     callSubProcess("cat {}".format(trainFile1), options.force,
             stdout=trainFileCombined, mode='w')
     # skip header second time
