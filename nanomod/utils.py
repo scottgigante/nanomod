@@ -194,4 +194,5 @@ def recursiveFindFast5(dir):
     for root, _, filenames in os.walk(dir):
         for filename in fnmatch.filter(filenames, '*.fast5'):
             files.append(os.path.join(root, filename))
+    logging.info("{}: found {} files.".format(dir, len(files)))
     return np.array(files)
