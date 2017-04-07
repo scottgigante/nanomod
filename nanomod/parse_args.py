@@ -75,6 +75,9 @@ def initialiseTrainArgs(options):
     makeDir(options.tempDir)
     makeDir(options.outPrefix)
 
+    # restrict dataFraction to [0,1]
+    options.dataFraction = min(max(options.dataFraction, 0),1)
+
     # make sure sequenceMotif is uppercase
     for i in range(len(options.sequenceMotif)):
         options.sequenceMotif[i] = options.sequenceMotif[i].upper()
@@ -207,7 +210,7 @@ def addTrainArgs(parser):
     parser.add_argument("--val-fraction", type=float, default=0.05,
             dest="valFraction", help="Fraction of data used for validation set")
     parser.add_argument("--data-fraction", type=float, default=0.1,
-            dest="dataFraction", help="Fraction of data to be sent to nanonet")
+            dest="dataFraction", help="Fraction of data to be sent to nanonet (overwritten by --num-reads)")
     parser.add_argument("--select-mode", choices=tuple(__modes__), default=["skip", "stay", "qscore"], nargs="*",
             help=("Method for choosing reads to send to nanonet; choose any or"
             " all from {}").format(", ".join(__modes__)),
