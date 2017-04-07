@@ -71,8 +71,6 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
     :param readLength: int length of labelled read
     :param kmer: int length of kmer labels
     :param genome: Dictionary containing genome records
-
-    :returns: Boolean, True: high quality read, False: low quality read
     """
 
     # all events are considered good emissions - bad idea?
@@ -141,9 +139,7 @@ def writeFast5(options, events, fast5Path, initial_ref_index, last_ref_index,
         attrs = attrsGroup.attrs
         attrs.create("genome", chromosome)
 
-    return 0
-
-def processEventalignWorker(options, eventalign, refs, idx, numReads, start, stop, genome, modified, kmer, alphabet):
+def processEventalignWorker(options, eventalign, refs, idx, start, stop, genome, modified, kmer, alphabet):
     """fast5Path, genome, modified, kmer, alphabet
     Write temporary .npy files to split eventalign tsv file into chunks
     corresponding to one fast5 file each - this allows multiprocessing later on.
@@ -159,8 +155,7 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
     :param kmer: int length of kmer labels
     :param alphabet: array of base labels in alphabet
 
-    :returns trainData: array of two-element arrays containing basename of fast5 file and boolean indicating read quality
-    :returns premadeFilenames: list of basenames of fast5 files which had already been processed prior to this call to Nanomod
+    :returns filenames: iterable of basenames of processed fast5 files
     """
 
     with open(eventalign, 'r') as tsv:
@@ -171,8 +166,6 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
         started=False if start > 0 else True
         events=None
         filenames = set()
-        premadeFilenames = set()
-        n=0
 
         for i, line in enumerate(reader):
 
@@ -197,9 +190,6 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
                             numSkips, numStays, readLength, kmer, genome)
                         filenames.add(fast5Name)
                         events = None
-                        n += 1
-                        if options.numReads > 0 and n >= options.numReads:
-                            break
                     except Exception as e:
                         logging.warning("Failed to save {}.".format(fast5Name))
                         logging.warning(str(e))
@@ -223,7 +213,7 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
                     # not template, skip
                     skip=True
                     continue
-                elif fast5Name in filenames or fast5Name in premadeFilenames:
+                elif fast5Name in filenames:
                     skip = True
                     continue
 
@@ -231,7 +221,7 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
                 filename = os.path.join(options.tempDir, fast5Name)
                 if preventOverwrite(outfile, options.force):
                     skip=True
-                    premadeFilenames.add(fast5Name)
+                    filenames.add(fast5Name)
                     continue
 
                 # open fast5 file
@@ -318,7 +308,7 @@ def processEventalignWorker(options, eventalign, refs, idx, numReads, start, sto
                 logging.warning("Failed to save {}.".format(fast5Name))
                 logging.warning(str(e))
 
-    return itertools.chain(filenames, premadeFilenames)
+    return itertools.chain(filenames)
 
 def processEventalign(options, eventalign, refs, genome, modified, alphabet):
     """
@@ -332,8 +322,7 @@ def processEventalign(options, eventalign, refs, genome, modified, alphabet):
     :param modified: Boolean value, whether or not this fast5 has modified motif
     :param alphabet: array of base labels in alphabet
 
-    :returns trainData: array of two-element arrays containing basename of fast5 file and boolean indicating read quality
-    :returns premadeFilenames: list of basenames of fast5 files which had already been processed prior to this call to Nanomod
+    :returns filenames: iterable of basenames of processed fast5 files
     """
 
     with open(eventalign, 'r') as tsv:
@@ -357,7 +346,7 @@ def processEventalign(options, eventalign, refs, genome, modified, alphabet):
         kmer=len(line[idx['ref_kmer']])
         # TODO: can we do this without reopening?
 
-    if options.threads > 1 and options.numReads <= 0:
+    if options.threads > 1:
         nlines = sum(1 for _ in open(eventalign, 'r'))
         threads = max(min(nlines / __max_read_len__, options.threads), 1)
         pool = Pool(threads)
@@ -368,12 +357,12 @@ def processEventalign(options, eventalign, refs, genome, modified, alphabet):
         splitRange = [nlines] + splitRange
 
         data = pool.map(processEventalignWorkerWrapper,
-                [[options, eventalign, refs, idx, -1, splitRange[i+1], splitRange[i], genome, modified, kmer, alphabet] for i in range(len(splitRange)-1)])
+                [[options, eventalign, refs, idx, splitRange[i+1], splitRange[i], genome, modified, kmer, alphabet] for i in range(len(splitRange)-1)])
         pool.close()
         pool.join()
         filenames = itertools.chain.from_iterable(data)
     else:
-        filenames = processEventalignWorker(options, eventalign, refs, idx, options.numReads, 0, None, genome, modified, kmer, alphabet)
+        filenames = processEventalignWorker(options, eventalign, refs, idx, 0, None, genome, modified, kmer, alphabet)
     return filenames
 
 def writeTrainfiles(options, filenames, outPrefix):
@@ -383,7 +372,8 @@ def writeTrainfiles(options, filenames, outPrefix):
     Small text files are used for selective training of a smaller dataset.
 
     :param options: Namespace object from argparse
-    :param trainData: Dataset consisting or two-element arrays of filename and boolean indicating read quality, where reads marked with True are included in the small dataset
+    :param filenames: List of fast5 filenames
+    :param outPrefix: string Prefix for nanomod output
     """
     trainFilename = outPrefix + ".train.txt"
     valFilename = outPrefix + ".val.txt"
@@ -424,7 +414,7 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
 
     :param options: Namespace object from argparse
     :param fasta: String filename corresponding to fasta file containing reads (MUST be produced by poretools in order to retrieve fasta names)
-    :param eventalign: subprocess.Process Process containing eventalign output
+    :param eventalign: string Path to eventalign output
     :param reads: String path to fast5 files
     :param outPrefix: String prefix for output files
     :param modified: Boolean value, whether or not reads have modified motif
@@ -438,7 +428,7 @@ def embedEventalign(options, fasta, eventalign, reads, outPrefix, modified):
     refs = loadRef(fasta)
     genome = loadGenome(options.genome, options.sequenceMotif, modified)
 
-    logging.info("Splitting eventalign into separate files...")
+    logging.info("Processing eventalign file...")
     alphabet = expandAlphabet(options.sequenceMotif)
     filenames = processEventalign(options, eventalign, refs, genome, modified, alphabet)
 
