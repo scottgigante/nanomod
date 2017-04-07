@@ -30,6 +30,7 @@ import subprocess
 import traceback
 import json
 import logging
+import numpy as np
 
 __log_levels__ = [logging.WARNING, logging.INFO, logging.DEBUG]
 
@@ -179,3 +180,17 @@ def multiprocessWrapper(func, args):
         traceback.print_exc()
         print()
         raise e
+
+def recursiveFindFast5(dir):
+    """
+    Recursively search for fast5 files
+
+    :param dir: string Path to reads directory
+
+    :returns: list of strings Paths to every fast5 file under dir
+    """
+    files = []
+    for root, _, filenames in os.walk(dir):
+        for filename in fnmatch.filter(filenames, '*.fast5'):
+            files.append(os.path.join(root, filename))
+    return np.array(files)

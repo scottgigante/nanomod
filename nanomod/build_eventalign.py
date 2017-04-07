@@ -147,6 +147,8 @@ def buildEventalign(options, reads, outPrefix):
     Build eventalign file according to nanopolish's pipeline.
 
     :param options: Namespace object from argparse
+    :param reads: list of strings Paths to fast5 files
+    :param outPrefix: string Prefix for output files
 
     :returns fastaFile: String Filename of fasta corresponding to reads
     :returns eventalign: subprocess.Process Process containing eventalign output
@@ -172,8 +174,7 @@ def buildEventalign(options, reads, outPrefix):
             multithreadPoretools(__exe__['poretools'], options.tempDir, options.force, filenames, fastaFile, options.readLength)
     else:
         # single threaded poretools - slow
-        poretools = callPopen(('{} fasta --type fwd {}').format(__exe__['poretools'],
-                reads), options.force, stdout=fastaFile)
+        poretools = callPopen(('{} fasta --type fwd').format(__exe__['poretools']), options.force, stdout=fastaFile)
         poretools.communicate(input='\n'.join(filenames))
         poretools.wait()
 

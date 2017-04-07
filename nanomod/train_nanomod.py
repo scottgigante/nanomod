@@ -86,6 +86,21 @@ def combineTrainingSets(options, t1, t2, outPrefix):
     callSubProcess("tail -n +2 {}".format(valFile2), options.force,
             stdout=valFileCombined, mode='a')
 
+def equaliseTrainingSets(f1, f2):
+    """
+    Equalise size of training sets by selecting randomly from the larger list.
+
+    :param f1: list of strings Paths to files from training set 1
+    :param f2: list of strings Paths to files from training set 2
+
+    :returns: f1, f2 Tuple of reduced lists
+    """
+    if len(f1) > len(f2):
+        f1 = f1[np.random.choice(len(f1), len(f2), replace=False)]
+    else
+        f2 = f2[np.random.choice(len(f2), len(f1), replace=False)]
+    return f1, f2
+
 def trainNanomod(options):
     """
     Run nanomod training
@@ -96,15 +111,19 @@ def trainNanomod(options):
         if options.modifiedReads is not None:
             canonicalPrefix = "{}.canonical".format(options.outPrefix)
             modifiedPrefix = "{}.modified".format(options.outPrefix)
-            # TODO: should we modify datafraction in case we have drastically different amounts of data for modified and canonical?
-            buildTrainingSet(options, options.canonicalReads, canonicalPrefix)
-            buildTrainingSet(options, options.modifiedReads, modifiedPrefix,
+            canonicalFiles = recursiveFindFast5(options.canonicalReads)
+            modifiedFiles = recursiveFindFast5(options.modifiedReads)
+            canonicalFiles, modifiedFiles = equaliseTrainingSets(canonicalFiles,
+                    modifiedFiles)
+            buildTrainingSet(options, canonicalFiles, canonicalPrefix)
+            buildTrainingSet(options, modifiedFiles, modifiedPrefix,
                     modified=True)
             combineTrainingSets(options, canonicalPrefix, modifiedPrefix,
                     options.outPrefix)
             trainNanonet(options)
         else:
-            buildTrainingSet(options, options.canonicalReads, options.outPrefix)
+            canonicalFiles = recursiveFindFast5(options.canonicalReads)
+            buildTrainingSet(options, canonicalFiles, options.outPrefix)
             trainNanonet(options)
     finally:
         # we'd better clean up after ourselves, even if it crashes

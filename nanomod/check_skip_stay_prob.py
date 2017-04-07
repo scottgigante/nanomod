@@ -72,11 +72,11 @@ def checkProbs(filename):
         skipProb, stayProb, stepProb, qscore = 1, 1, 0, 0, 0
     return [skipProb, stayProb, stepProb, qscore, readLength]
 
-def selectBestReads(dir, proportion, numReads, mode=__modes__, threads=1, readLength=5000):
+def selectBestReads(files, proportion, numReads, mode=__modes__, threads=1, readLength=5000):
     """
     Choose the best subset of reads from a directory
 
-    :param dir: string The directory to search for fast5 files
+    :param files: list of strings Paths to files to be analysed
     :param proportion: float The desired proportion of reads to be retained (overwritten by numReads)
     :param numReads: int The number of reads to be retained
     :param mode: list of strings Any or all of 'skip', 'stay', 'step', 'qscore', and 'random'
@@ -89,12 +89,6 @@ def selectBestReads(dir, proportion, numReads, mode=__modes__, threads=1, readLe
     for m in mode:
         if m not in __modes__:
             logging.warning("Mode {} not recognised")
-
-    # recursive search for files
-    files = []
-    for root, _, filenames in os.walk(dir):
-        for filename in fnmatch.filter(filenames, '*.fast5'):
-            files.append(os.path.join(root, filename))
 
     # check number of reads to retain
     if numReads > 0:
