@@ -32,8 +32,9 @@ import os
 import sys
 import shutil
 import logging
+import numpy as np
 
-from utils import callSubProcess
+from utils import callSubProcess, recursiveFindFast5
 from build_eventalign import buildEventalign
 from embed_eventalign import embedEventalign
 from train_nanonet import trainNanonet
@@ -97,7 +98,7 @@ def equaliseTrainingSets(f1, f2):
     """
     if len(f1) > len(f2):
         f1 = f1[np.random.choice(len(f1), len(f2), replace=False)]
-    else
+    else:
         f2 = f2[np.random.choice(len(f2), len(f1), replace=False)]
     return f1, f2
 

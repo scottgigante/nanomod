@@ -28,7 +28,6 @@
 import h5py
 import sys
 import os
-import fnmatch
 import numpy as np
 from multiprocessing import Pool
 import json
