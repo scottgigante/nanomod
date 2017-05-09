@@ -22,8 +22,10 @@
 # Date: 19 Jan 2017                                                            #
 #                                                                              #
 ################################################################################
-
+# TODO: put modProb back in
+# TODO: remove check for c
 #!/usr/bin/env python
+from __future__ import print_function
 
 from multiprocessing import Pool, Lock
 from Bio import SeqIO
@@ -46,34 +48,34 @@ def getBayesPercentage(numMods, numUnmods, alpha):
     :param alpha: Hyperparameter for beta prior
     """
     # TODO: implement glm solution instead
-    return float(numMods + alpha)/(numMods + numUnmods + alpha)
+    return float(numMods + alpha)/(numMods + numUnmods + 2 * alpha)
 
-def checkModifiedPositions(options):
+def checkModifiedPositions(genome, sequenceMotif):
     """
     Find all positions on genome where modification motif appears.
+
+    # TODO: this is slow for large genomes and could be easily parallelised
 
     :param options: Namespace object from argparse
 
     :returns modPositions: Dictionary of dictionaries: one dict for each contig, each of which has one dict for forward and one for reverse, each of which is a list of integer positions of modified motifs
     :returns canonGenome: Seq.Seq Unmodified genome sequence
-
-    TODO: can we remove dependence on options here?
     """
     modPositions = dict()
-    canonGenome = loadGenome(options.genome, options.sequenceMotif)
-    modGenome = loadGenome(options.genome, options.sequenceMotif, modified=True)
+    canonGenome = loadGenome(genome, sequenceMotif)
+    modGenome = loadGenome(genome, sequenceMotif, modified=True)
     for contig in canonGenome:
-        modPositions[contig] = dict()
-        modPositions[contig]['+'] = getSeqDiff(
-                canonGenome[contig]['seq'],
-                modGenome[contig]['seq'])
-        modPositions[contig]['-'] = getSeqDiff(
-                canonGenome[contig]['reverseSeq'],
-                modGenome[contig]['reverseSeq'])
+        modPositions[contig] = {'+' : dict(), '-' : dict()}
+        for i in getSeqDiff(canonGenome[contig]['seq'],
+                modGenome[contig]['seq']):
+            modPositions[contig]['+'][i] = True
+        for i in getSeqDiff(canonGenome[contig]['reverseSeq'],
+                modGenome[contig]['reverseSeq']):
+            modPositions[contig]['-'][i] = True
     return modPositions, canonGenome
 
 def checkReadModification(queryName, readPos, readLength, cigarTuples, reverse,
-        modDir):
+        modDir, modIndices):
     """
     Check if a read is modified at a point.
 
@@ -88,18 +90,28 @@ def checkReadModification(queryName, readPos, readLength, cigarTuples, reverse,
     """
     # TODO: check that this checks the correct position
     if reverse:
-        readPos = -readPos-1
-        readPos += readLength
-    startHardClip = cigarTuples[0][1] if cigarTuples[0][0] == 5 else 0
+        readPos = readLength-readPos-1
+        startHardClip = cigarTuples[-1][1] if cigarTuples[-1][0] == 5 else 0
+    else:
+        startHardClip = cigarTuples[0][1] if cigarTuples[0][0] == 5 else 0
     readPos += startHardClip
-
-    modFile = os.path.join(modDir, queryName)
-    with open(modFile, 'rb') as handle:
-        modIndex = json.load(handle)
-    for base in modIndex:
-        if readPos in modIndex[base]:
-            return base
-    return False
+    try:
+        modIndex = modIndices[queryName]
+    except KeyError:
+        try:
+            modFile = os.path.join(modDir, queryName)
+            with open(modFile, 'rb') as handle:
+                modIndex = json.load(handle)
+            modIndices[queryName] = modIndex
+        except IOError:
+            # no file, read has no mods
+            modIndices[queryName] = {}
+            return False, modIndices
+    try:
+        return modIndex[str(readPos)], modIndices
+    except KeyError:
+        # not modified
+        return False, modIndices
 
 def checkMotif(readPos, sequenceMotif, motifModPos, seq, deletion=False):
     """
@@ -158,8 +170,8 @@ def checkMotif(readPos, sequenceMotif, motifModPos, seq, deletion=False):
         readIdx -= 1
     return True
 
-def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, modDir,
-        dtype, options):
+def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, refPos,
+        modDir, modIndices, dtype, sequenceMotif):
     """
     Process modification motifs over a genomic window.
 
@@ -174,19 +186,23 @@ def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, 
 
     :returns: numpy.ndarray Position, counts, and predicted modification percentage at this location, or None if no motif exists
     """
-    refPos = pileupColumn.reference_pos
 
     # check if there are any modifiable bases in this position on reference
     checkFwd = False
     checkReverse = False
-    refName = pileupColumn.reference_name
-    if refPos in modPositions[refName]['+']:
+    try:
+        modPositions[contig]['+'][refPos]
         checkFwd = True
-    if (-refPos-1+len(genome)) in modPositions[refName]['-']:
+    except KeyError:
+        pass
+    try:
+        modPositions[contig]['-'][-refPos-1+len(genome)]
         checkReverse = True
+    except KeyError:
+        pass
     if not (checkFwd or checkReverse):
         # ref genome is not modified here
-        return
+        return None, modIndices
 
     # count modifications
     count = { 'M' : 0, # modified in correct motif
@@ -209,36 +225,35 @@ def processBase(pileupColumn, alpha, modPositions, motifModPos, genome, contig, 
         readPos = read.query_position
         if read.is_del == 1:
             # deletion
-            if checkMotif(read.query_position_or_next, options.sequenceMotif, motifModPos, read.alignment.query_sequence, deletion=True):
+            if checkMotif(read.query_position_or_next, sequenceMotif, motifModPos, read.alignment.query_sequence, deletion=True):
                 count['D'] += 1
             else:
                 count['d'] += 1
             continue
         if not (read.alignment.query_sequence[readPos] == genome[refPos]):
             # mismatch
-            if checkMotif(readPos, options.sequenceMotif, motifModPos, read.alignment.query_sequence):
+            if checkMotif(readPos, sequenceMotif, motifModPos, read.alignment.query_sequence):
                 count['X'] += 1
             else:
                 count['x'] += 1
             continue
 
-        try:
-            if checkReadModification(read.alignment.query_name, readPos,
-                    read.alignment.query_length, read.alignment.cigartuples,
-                    reverse, modDir) is not False:
-                count['M'] += 1
+        mod, modIndices = checkReadModification(read.alignment.query_name, readPos,
+                read.alignment.query_length, read.alignment.cigartuples,
+                reverse, modDir, modIndices)
+        if mod is not False:
+            count['M'] += 1
+        else:
+            if checkMotif(readPos, sequenceMotif, motifModPos, read.alignment.query_sequence):
+                count['U'] += 1
             else:
-                if checkMotif(readPos, options.sequenceMotif, motifModPos, read.alignment.query_sequence):
-                    count['U'] += 1
-                else:
-                    count['u'] += 1
-        except IOError as e:
-            logging.warning(str(e))
-    modProb = getBayesPercentage(count['M'], count['U'], alpha)
-    return np.array([(contig, refPos, modProb, count['M'], count['U'], count['u'], count['X'], count['x'], count['D'], count['d'])], dtype=dtype)
+                count['u'] += 1
+    #modProb = getBayesPercentage(count['M'], count['U'], alpha)
+    #return np.array([(contig, refPos, modProb, count['M'], count['U'], count['u'], count['X'], count['x'], count['D'], count['d'])], dtype=dtype)
+    return np.array([(contig, refPos, count['M'], count['U'], count['u'], count['X'], count['x'], count['D'], count['d'])], dtype=dtype), modIndices
 
 def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions, motifModPos,
-        genome, modDir, dtype, options):
+        genome, modDir, dtype, sequenceMotif):
     """
     Process modification motifs over a genomic window.
 
@@ -258,12 +273,13 @@ def processWindow(bamFile, contig, startPos, endPos, alpha, modPositions, motifM
     """
     bam = pysam.AlignmentFile(bamFile, "rb")
     output = np.empty(shape=(0,), dtype=dtype)
+    modIndices = {}
     for base in bam.pileup(contig, startPos, endPos):
         refPos = base.reference_pos
         if refPos >= startPos and refPos < endPos:
             # window is expanded for some reason
-            baseOutput = processBase(base, alpha, modPositions, motifModPos, genome, contig,
-                    modDir, dtype, options)
+            baseOutput, modIndices = processBase(base, alpha, modPositions, motifModPos, genome, contig, refPos,
+                    modDir, modIndices, dtype, sequenceMotif)
             if baseOutput is not None:
                 output = np.append(output, baseOutput)
     bam.close()
@@ -280,7 +296,7 @@ def processWindowWrapper(args):
     return multiprocessWrapper(processWindow, args)
 
 def aggregateWindowCounts(modCounts, pos, row, forwardStep, backStep, contig,
-        aggDtype, options):
+        aggDtype, alpha):
     """
     Aggregate counts over a window of multiple bases.
 
@@ -314,9 +330,8 @@ def aggregateWindowCounts(modCounts, pos, row, forwardStep, backStep, contig,
             }
     for base, column in zip(count.keys(), ['f{}'.format(i+3) for i in range(len(count))]):
         count[base] = sum(countsWindow[column])
-    print [startPos, endPos, numReads]
     modProb = getBayesPercentage(numMods, numUnmods, numReads,
-                options.alpha)
+                alpha)
     return np.array([tuple(itertools.chain([contig, startPos, endPos, modProb], count.values()))], dtype=aggDtype)
 
 def countModifications(bamFile, modDir, options):
@@ -334,21 +349,29 @@ def countModifications(bamFile, modDir, options):
     # TODO: use consistent output for window of 1 and window of X
     """
     logging.info("Indexing modification sites on reference genome...")
-    modPositions, genome = checkModifiedPositions(options)
+    modPositions, genome = checkModifiedPositions(options.genome, options.sequenceMotif)
     motifModPos = [i for i in xrange(len(options.sequenceMotif[0])) if options.sequenceMotif[0][i] != options.sequenceMotif[1][i]][0]
 
     # S32 string, <u4 uint32, <f4 float32, u1 uint8 <u2 uint16
-    dtype = np.dtype("S32,<u4,<f4,u1,u1,u1,u1,u1,u1,u1")
-    aggDtype = np.dtype("S32,<u4,<u4,<f4,<u2,<u2,<u2,<u2,<u2,<u2,<u2")
+    #dtype = np.dtype("S32,<u4,<f4,u1,u1,u1,u1,u1,u1,u1")
+    dtype = np.dtype("S32,<u4,u1,u1,u1,u1,u1,u1,u1")
+    #aggDtype = np.dtype("S32,<u4,<u4,<f4,<u2,<u2,<u2,<u2,<u2,<u2,<u2")
+    aggDtype = np.dtype("S32,<u4,<u4,<u2,<u2,<u2,<u2,<u2,<u2,<u2")
     if options.window is None or options.window < 2:
-        fmt = "\t".join(["%s","%i","%lf","%i","%i","%i","%i","%i","%i","%i"])
-        header = "\t".join(["Chromosome", "Position", "Modified Percentage",
+        #fmt = "\t".join(["%s","%i","%lf","%i","%i","%i","%i","%i","%i","%i"])
+        fmt = "\t".join(["%s","%i","%i","%i","%i","%i","%i","%i","%i"])
+        #header = "\t".join(["Chromosome", "Position", "Modified Percentage",
+        #        "M", "U", "u", "X", "x", "D", "d"])
+        header = "\t".join(["Chromosome", "Position",
                 "M", "U", "u", "X", "x", "D", "d"])
         modCounts = np.empty(shape=(0,), dtype=dtype)
     else:
-        fmt = "\t".join(["%s","%i","%i","%lf","%i","%i","%i","%i","%i","%i","%i"])
+        #fmt = "\t".join(["%s","%i","%i","%lf","%i","%i","%i","%i","%i","%i","%i"])
+        fmt = "\t".join(["%s","%i","%i","%i","%i","%i","%i","%i","%i","%i"])
+        #header = "\t".join(["Chromosome", "Start", "Stop",
+        #        "Modified Percentage", "M", "U", "u", "X", "x", "D", "d"])
         header = "\t".join(["Chromosome", "Start", "Stop",
-                "Modified Percentage", "M", "U", "u", "X", "x", "D", "d"])
+                "M", "U", "u", "X", "x", "D", "d"])
         modCounts = np.empty(shape=(0,), dtype=aggDtype)
 
     logging.info("Analyzing read modifications...")
@@ -366,11 +389,12 @@ def countModifications(bamFile, modDir, options):
                 if options.region[2] is not None:
                     refEnd = min(refEnd, options.region[2])
 
-        windowArray = [i for i in xrange(refStart, refEnd, basesPerCall)]
+        q, r = divmod(refEnd-refStart, options.threads)
+        windowArray = [q*i + min(i, r) + refStart for i in xrange(options.threads + 1)]
         p = Pool(options.threads)
-        argsList = [[bamFile, contig, i, min(i+basesPerCall, refEnd),
+        argsList = [[bamFile, contig, windowArray[i], windowArray[i+1],
                 options.alpha, modPositions, motifModPos, genome[contig]['seq'],
-                modDir, dtype, options] for i in windowArray]
+                modDir, dtype, options.sequenceMotif] for i in range(len(windowArray)-1)]
         windows = p.map(processWindowWrapper, argsList)
         for w in windows:
             contigModCounts = np.append(contigModCounts, w)
@@ -384,7 +408,7 @@ def countModifications(bamFile, modDir, options):
             for i in range(contigModCounts.shape[0]):
                 pos = contigModCounts['f1'][i]
                 window = aggregateWindowCounts(contigModCounts, pos, i,
-                        forwardStep, backStep, contig, aggDtype, options)
+                        forwardStep, backStep, contig, aggDtype, options.alpha)
                 if modCounts.shape[0] == 0 or not window == modCounts[-1]:
                     # exclude duplicate rows
                     modCounts = np.append(modCounts, window)

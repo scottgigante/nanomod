@@ -16,6 +16,8 @@
 # index_modifications.py: Index where modified bases are in each read          #
 # Input: fast5 reads and nanomod trained network                               #
 # Output: fasta, bam, and file indexing probability of methylation per-base.   #
+#
+# TODO: store in memory rather than saving to disk
 #                                                                              #
 # Author: Scott Gigante                                                        #
 # Contact: gigante.s@wehi.edu.au                                               #
@@ -29,41 +31,43 @@ import os
 import json
 import logging
 from multiprocessing import Pool
+import re
 
 from seq_tools import unmodifyFasta, __canonical__
 from utils import makeDir, multiprocessWrapper, preventOverwrite
 
-def indexRead(record, outputDir, options):
+def indexRead(pattern, record, outputDir, force):
     outputFile = os.path.join(outputDir, record.id)
-    if preventOverwrite(outputFile, options):
+    if preventOverwrite(outputFile, force):
         return
     modIndex = dict()
-    for i in range(len(record.seq)):
-        if record.seq[i] not in __canonical__:
-            try:
-                modIndex[record.seq[i]].append(i)
-            except KeyError:
-                # not yet initialised
-                modIndex[record.seq[i]] = [i]
-    with open(outputFile, 'wb') as handle:
-        json.dump(modIndex, fp=handle)
+    for m in pattern.finditer(str(record.seq)):
+        i = m.start()
+        modIndex[i] = record.seq[i]
+    if modIndex != {}:
+        with open(outputFile, 'wb') as handle:
+            json.dump(modIndex, fp=handle)
 
 def indexReadWrapper(args):
     return multiprocessWrapper(indexRead, args)
 
 def indexAndCleanModifications(fastaFile, options):
+    unmodifiedFastaFile = "{}.unmodified.fasta".format(options.outPrefix)
     outputDir = "{}.modIndex".format(options.outPrefix)
+    if preventOverwrite(unmodifiedFastaFile, options.force): # TODO: what if indexing crashes?
+        return unmodifiedFastaFile, outputDir
+
     makeDir(outputDir)
 
     logging.info("Cleaning fasta of modifications...")
-    # TODO: should we avoid overwrite here? would have to reload fasta
-    unmodifiedFastaFile = "{}.unmodified.fasta".format(options.outPrefix)
-    fasta = unmodifyFasta(fastaFile, unmodifiedFastaFile, options.sequenceMotif)
+    fasta = unmodifyFasta(fastaFile, unmodifiedFastaFile, options.sequenceMotif, options.threads)
 
     logging.info("Indexing modifications on reads...")
     p = Pool(options.threads)
-    p.map(indexReadWrapper, [[i, outputDir, options] for i in fasta])
-
+    pattern = re.compile("[^{}]".format("|".join(__canonical__)))
+    p.imap_unordered(indexReadWrapper, ([pattern, i, outputDir, options.force] for i in fasta))
+    p.close()
+    p.join()
     return unmodifiedFastaFile, outputDir
 
 
