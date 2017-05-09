@@ -32,6 +32,8 @@ import json
 import logging
 import numpy as np
 import fnmatch
+import multiprocessing
+import itertools
 
 __log_levels__ = [logging.WARNING, logging.INFO, logging.DEBUG]
 
@@ -184,6 +186,34 @@ def multiprocessWrapper(func, args):
 
 def recursiveFindFast5(dir):
     """
+    Recursively search for fast5 files using parallel processes
+
+    :param dir: string Path to reads directory
+
+    :returns: list of strings Paths to every fast5 file under dir
+    """
+    dirList = list()
+    files = list()
+    for subpath in os.listdir(dir):
+        absSubpath = os.path.join(dir, subpath)
+        if os.path.isdir(absSubpath):
+            dirList.append(absSubpath)
+        elif subpath.endswith(".fast5"):
+            files.append(absSubpath)
+
+    pool = multiprocessing.Pool()
+    while len(dirList) != 0:
+        data = pool.map(recursiveFindFast5Worker, dirList)
+        subfiles, subdirs = itertools.izip(*data)
+        files = np.append(files, np.concatenate(subfiles))
+        dirList = np.concatenate(subdirs)
+    pool.close()
+    pool.join()
+    logging.info("{}: found {} files.".format(dir, len(files)))
+    return files
+
+def recursiveFindFast5Worker(dir):
+    """
     Recursively search for fast5 files
 
     :param dir: string Path to reads directory
@@ -191,8 +221,12 @@ def recursiveFindFast5(dir):
     :returns: list of strings Paths to every fast5 file under dir
     """
     files = list()
-    for root, _, filenames in os.walk(dir):
-        for filename in fnmatch.filter(filenames, '*.fast5'):
-            files.append(os.path.join(root, filename))
-    logging.info("{}: found {} files.".format(dir, len(files)))
-    return np.array(files)
+    subdirs = list()
+    for subpath in os.listdir(dir):
+        absSubpath = os.path.join(dir, subpath)
+        if os.path.isdir(absSubpath):
+            subdirs.append(absSubpath)
+        elif subpath.endswith(".fast5"):
+            files.append(absSubpath)
+    logging.debug("{}: found {} files.".format(dir, len(files)))
+    return files, subdirs

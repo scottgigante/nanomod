@@ -200,7 +200,7 @@ if __name__ == "__main__":
     """
     args = sys.argv
     try:
-        run(args[1], args[2], int(args[3]), [args[4], args[5]])
+        expandModelAlphabet(args[1], args[2], int(args[3]), [args[4], args[5]])
     except IndexError:
         # no sequence motif specified
-        run(args[1], args[2], int(args[3]))
+        expandModelAlphabet(args[1], args[2], int(args[3]))
