@@ -92,11 +92,12 @@ def equaliseTrainingSets(f1, f2):
     :returns: f1, f2 Tuple of reduced lists
     """
 
-    if len(f1) > len(f2):
-        f1 = f1[np.random.choice(len(f1), len(f2), replace=False)]
-    else:
-        f2 = f2[np.random.choice(len(f2), len(f1), replace=False)]
-    logging.info("Randomly restricting both datasets to {} files.".format(max(len(f1), len(f2))))
+    l1, l2 = len(f1), len(f2)
+    if l1 > l2:
+        f1 = f1[np.random.choice(l1, l2, replace=False)]
+    elif l2 > l1:
+        f2 = f2[np.random.choice(l2, l1, replace=False)]
+    logging.info("Randomly restricting both datasets to {} files.".format(max(l1, l2)))
     return f1, f2
 
 def trainNanomod(options):
