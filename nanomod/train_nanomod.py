@@ -94,9 +94,9 @@ def equaliseTrainingSets(f1, f2):
 
     l1, l2 = len(f1), len(f2)
     if l1 > l2:
-        f1 = f1[np.random.choice(l1, l2, replace=False)]
+        f1 = np.array(f1)[np.random.choice(l1, l2, replace=False)]
     elif l2 > l1:
-        f2 = f2[np.random.choice(l2, l1, replace=False)]
+        f2 = np.array(f2)[np.random.choice(l2, l1, replace=False)]
     logging.info("Randomly restricting both datasets to {} files.".format(max(l1, l2)))
     return f1, f2
 
