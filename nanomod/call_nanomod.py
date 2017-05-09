@@ -26,55 +26,45 @@
 #!/usr/bin/env python
 
 import numpy as np
-import re
 import h5py
 import os
+import multiprocessing
+import functools
+import logging
 
-from utils import callSubProcess, configureLog
+from utils import callSubProcess, configureLog, preventOverwrite, makeDir, recursiveFindFast5
 from index_modifications import indexAndCleanModifications
 from summarise_modifications import countModifications
 from shutil import copyfile
 from build_eventalign import buildSortedBam
 from . import __exe__
 
-def parseRegion(region):
-    """
-    Parse a region specification.
+def normalizeRead(outPrefix, input):
+    read, subfolder = input
+    outDir = os.path.join(outPrefix, "nanomod", str(subfolder))
+    makeDir(outDir)
+    newRead = os.path.join(outDir, os.path.basename(read))
+    copyfile(read, newRead)
+    try:
+        with h5py.File(newRead, 'r+') as outFile:
+            raw_group = outFile["Raw/Reads"].values()[0]
+            signal = raw_group["Signal"][()]
+            med = np.median(signal)
+            median_deviation = signal - med
+            MAD = np.median(abs(median_deviation))
+            signal = median_deviation / MAD
+            try:
+                del outFile["Analyses"]
+            except KeyError:
+                # no analyses, no worries
+                pass
+            del raw_group["Signal"]
+            raw_group["Signal"] = signal
+    except Exception as e:
+        logging.warning("Failed to normalize file {}: {}".format(os.path.basename(read), str(e)))
+        os.remove(newRead)
 
-    :param region: String region specification
-
-    :raises argparse.ArgumentTypeError: raises an error if format not recognised
-
-    :returns contig: String contig / chromosome name
-    :returns start: integer start position (0-based)
-    :returns end: integer end position (1-based)
-
-    >>> parseRegion("chr1:1000-2000")
-    ("chr1", 1000, 2000)
-
-    """
-    region = ''.join(region.split()) # remove whitespace
-    region = re.split(':|-', region)
-    start = 0
-    end = None
-    if len(region) < 1:
-        raise argparse.ArgumentTypeError("Region must specify a reference name")
-    elif len(region) > 3:
-        raise argparse.ArgumentTypeError("Region format not recognized")
-    else:
-        contig = region[0]
-        try:
-            start = int(re.sub(",|\.", "", region[1]))
-        except IndexError:
-            pass
-        try:
-            end = int(re.sub(",|\.", "", region[2]))
-        except IndexError:
-            pass
-        finally:
-            return contig, start, end
-
-def normalizeReads(reads):
+def normalizeReads(outPrefix, reads, threads):
     """
     Normalise raw signal using median normalization
 
@@ -85,23 +75,15 @@ def normalizeReads(reads):
     TODO: does nanonetcall use raw signal or event data?
     """
     # TODO: we do this twice - make this into a routine.
-    newReads = os.path.join(options.reads, "nanomod")
-    os.mkdir(newReads)
-    for f in os.listdir(options.reads):
-        if f.endswith(".fast5"):
-            path = os.path.join(options.reads, f)
-            newPath = os.path.join(options.reads, "nanomod", f)
-            copyfile(path, newPath)
-            with h5py.File(newPath, 'r+') as f:
-                raw_group = f["Raw/Reads"].values()[0]
-                signal = raw_group["Signal"][()]
-                med = np.median(signal)
-                median_deviation = signal - med
-                MAD = np.median(abs(median_deviation))
-                signal = median_deviation / MAD
-                del raw_group["Signal"]
-                del f["Analyses"]
-                raw_group["Signal"] = signal
+    newReads = os.path.join(outPrefix, "nanomod")
+    makeDir(outPrefix)
+    makeDir(newReads)
+    readList = recursiveFindFast5(reads)
+    argList = ((readList[i], i//4000) for i in range(len(readList)))
+    pool = multiprocessing.Pool(threads)
+    pool.map(functools.partial(normalizeRead, outPrefix), argList)
+    pool.close()
+    pool.join()
     return newReads
 
 def callNanomod(options):
@@ -111,21 +93,22 @@ def callNanomod(options):
     :param options: Namespace object from argparse
     """
 
-    if not options.noNormalize:
-        # median normalise raw signal
-        options.reads = normalizeReads(options.reads)
-
     fastaFile = "{}.fasta".format(options.outPrefix)
-    args = [__exe__['nanonetcall'], "--chemistry", options.chemistry,
-            "--jobs", str(options.threads), "--model", options.model,
-            "--output", fastaFile, "--section", "template", options.reads]
-    if args.numReads > 0:
-        args.extend(["--limit", str(options.numReads)])
-    callSubProcess(args, options.force, shell=False, newFile=fastaFile)
+    if not preventOverwrite(fastaFile, options.force):
+        if not options.noNormalize:
+            # median normalise raw signal
+            options.reads = normalizeReads(options.outPrefix, options.reads, options.threads)
+        fastaFile = "{}.fasta".format(options.outPrefix)
+        args = [__exe__['nanonetcall'], "--chemistry", options.chemistry,
+                "--jobs", str(options.threads), "--model", options.model,
+                "--output", fastaFile, "--section", "template", options.reads]
+        if options.numReads > 0:
+            args.extend(["--limit", str(options.numReads)])
+        callSubProcess(args, options.force, shell=False, newFile=fastaFile)
 
     unmodifiedFastaFile, modDir = indexAndCleanModifications(fastaFile, options)
 
-    sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, options.outPrefix, options.force)
+    sortedBamFile = buildSortedBam(options.threads, options.genome, unmodifiedFastaFile, options.outPrefix, options.force)
 
     fmt, header, modCounts = countModifications(sortedBamFile, modDir, options)
     #wig = getWiggleTrack(modificationCounts)
