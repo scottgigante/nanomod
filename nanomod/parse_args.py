@@ -35,6 +35,7 @@ import tempfile
 import shutil
 import logging
 import numpy as np
+import re
 
 from utils import makeDir, configureLog
 from pickle_to_currennt import convertPickle
@@ -59,6 +60,43 @@ __epilog__ = {
                 --model models/5mc.nanomod.npy --output-prefix data/test --threads
                 16"""
     }
+
+def parseRegion(region):
+    """
+    Parse a region specification.
+
+    :param region: String region specification
+
+    :raises argparse.ArgumentTypeError: raises an error if format not recognised
+
+    :returns contig: String contig / chromosome name
+    :returns start: integer start position (0-based)
+    :returns end: integer end position (1-based)
+
+    >>> parseRegion("chr1:1000-2000")
+    ("chr1", 1000, 2000)
+
+    """
+    region = ''.join(region.split()) # remove whitespace
+    region = re.split(':|-', region)
+    start = 0
+    end = None
+    if len(region) < 1:
+        raise argparse.ArgumentTypeError("Region must specify a reference name")
+    elif len(region) > 3:
+        raise argparse.ArgumentTypeError("Region format not recognized")
+    else:
+        contig = region[0]
+        try:
+            start = int(re.sub(",|\.", "", region[1]))
+        except IndexError:
+            pass
+        try:
+            end = int(re.sub(",|\.", "", region[2]))
+        except IndexError:
+            pass
+        finally:
+            return contig, start, end
 
 def initialiseTrainArgs(options):
     """
