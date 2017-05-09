@@ -34,7 +34,7 @@ import shutil
 import logging
 import numpy as np
 
-from utils import callSubProcess, recursiveFindFast5
+from utils import callSubProcess, recursiveFindFast5, preventOverwrite
 from build_eventalign import buildEventalign
 from embed_eventalign import embedEventalign
 from train_nanonet import trainNanonet
@@ -70,22 +70,17 @@ def combineTrainingSets(options, t1, t2, outPrefix):
     :param t2: Prefix for training set 2
     :param outPrefix: Prefix for output files
     """
-    trainFile1 = "{}.train.txt".format(t1)
-    trainFile2 = "{}.train.txt".format(t2)
-    valFile1 = "{}.val.txt".format(t1)
-    valFile2 = "{}.val.txt".format(t2)
-    trainFileCombined = "{}.train.txt".format(outPrefix)
-    valFileCombined = "{}.val.txt".format(outPrefix)
-    callSubProcess("cat {}".format(trainFile1), options.force,
-            stdout=trainFileCombined, mode='w')
-    # skip header second time
-    callSubProcess("tail -n +2 {}".format(trainFile2), options.force,
-            stdout=trainFileCombined, mode='a')
-    callSubProcess("cat {}".format(valFile1), options.force,
-            stdout=valFileCombined, mode='w')
-    # skip header second time
-    callSubProcess("tail -n +2 {}".format(valFile2), options.force,
-            stdout=valFileCombined, mode='a')
+    trainFiles = ("{}.train.txt".format(t1), "{}.train.txt".format(t2), "{}.train.txt".format(outPrefix))
+    valFiles = ("{}.val.txt".format(t1), "{}.val.txt".format(t2), "{}.val.txt".format(outPrefix))
+    for file1, file2, combinedFile in [trainFiles, valFiles]:
+        # grab header
+        callSubProcess("head -n 1 {}".format(file1), options.force,
+                stdout=combinedFile, mode='w')
+        # remove headers
+        callSubProcess("sed -i '1d' {}".format(file1), options.force)
+        callSubProcess("sed -i '1d' {}".format(file2), options.force)
+        callSubProcess("paste -d '\n' {} {}".format(file1, file2), options.force,
+                stdout=combinedFile, mode='a')
 
 def equaliseTrainingSets(f1, f2):
     """
