@@ -61,14 +61,17 @@ def checkProbs(filename):
         with h5py.File(filename, 'r') as fh:
             attrs = fh.get("Analyses/Basecall_1D_000/Summary/basecall_1d_template").attrs
             numEvents = float(attrs["called_events"])
-            skipProb = float(attrs["num_skips"])/numEvents
-            stayProb = float(attrs["num_stays"])/numEvents
+            skipProb = float(attrs["skip_prob"])
+            stayProb = float(attrs["stay_prob"])
             stepProb = 1-skipProb-stayProb
             qscore = float(attrs["mean_qscore"])
             readLength = int(attrs["sequence_length"])
     except IOError:
         logging.warning("Failed to open {}".format(filename))
-        skipProb, stayProb, stepProb, qscore = 1, 1, 0, 0, 0
+        skipProb, stayProb, stepProb, qscore, readLength = 1, 1, 0, 0, 0
+    except AttributeError:
+        logging.warning("{}: summary not found".format(filename))
+        skipProb, stayProb, stepProb, qscore, readLength = 1, 1, 0, 0, 0
     return [skipProb, stayProb, stepProb, qscore, readLength]
 
 def selectBestReads(files, proportion, numReads, mode=__modes__, threads=1, readLength=5000):
@@ -98,6 +101,7 @@ def selectBestReads(files, proportion, numReads, mode=__modes__, threads=1, read
     if "random" in mode:
         # not much to do
         files = np.array(files)
+        logging.info("Selecting {} reads.".format(selectNum))
         return files[np.random.choice(len(files), selectNum, replace=False)]
 
     # get read stats
