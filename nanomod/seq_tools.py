@@ -30,6 +30,9 @@ import os
 from copy import copy
 import numpy as np
 import re
+import multiprocessing
+import functools
+import itertools
 
 __canonical__ = ['A','G','C','T']
 __wildcards__ = { 'W' : ['A', 'T'],
@@ -77,7 +80,12 @@ def expandAlphabet(sequenceMotif, alphabet=__canonical__):
             expanded.append(base)
     return sorted(expanded)
 
-def unmodifyFasta(inFile, outFile, sequenceMotif):
+def unmodifyRecord(record, sequenceMotif):
+    unmodifiedRecord = copy(record)
+    unmodifiedRecord.seq = unmodifySeq(unmodifiedRecord.seq, sequenceMotif)
+    return record, unmodifiedRecord
+
+def unmodifyFasta(inFile, outFile, sequenceMotif, threads):
     """
     Load a fasta file and clean it of base modifications, returning the
     original fasta as an array of records.
@@ -88,15 +96,16 @@ def unmodifyFasta(inFile, outFile, sequenceMotif):
 
     :returns: list of records in original fasta file
     """
-    fasta = []
+    pool = multiprocessing.Pool(threads)
     with open(inFile, "rU") as inHandle, open(outFile, "w") as outHandle:
-        for record in SeqIO.parse(inHandle, "fasta"):
-            fasta.append(record)
-            unmodifiedRecord = copy(record)
-            unmodifiedRecord.seq = unmodifySeq(unmodifiedRecord.seq,
-                    sequenceMotif)
+        unmodifiedFasta = pool.imap_unordered(
+                functools.partial(unmodifyRecord, sequenceMotif=sequenceMotif),
+                SeqIO.parse(inHandle, "fasta"))
+        for record, unmodifiedRecord in unmodifiedFasta:
             SeqIO.write(unmodifiedRecord, outHandle, "fasta")
-    return fasta
+            yield record
+    pool.close()
+    pool.join()
 
 def loadRef(fasta):
     """
@@ -252,4 +261,6 @@ def getSeqDiff(s1, s2):
     """
     if len(s1) != len(s2):
         raise IndexError("Sequences must be of same length")
-    return [i for i in xrange(len(s1)) if s1[i] != s2[i]]
+    for i in xrange(len(s1)):
+        if s1[i] != s2[i]:
+            yield i
