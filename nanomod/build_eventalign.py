@@ -113,6 +113,11 @@ def buildSortedBam(threads, genome, fastaFile, outPrefix, force, mapq=30):
 
     :returns: string path to sorted bam file
     """
+
+    # index genome using bwa
+    callSubProcess('{} index {}'.format(__exe__['bwa'], genome),
+            force, newFile="{}.bwt".format(genome))
+
     samFile = "{}.sam".format(outPrefix)
     sortedBamFile = "{}.sorted.bam".format(outPrefix)
 
@@ -155,37 +160,32 @@ def buildEventalign(options, reads, outPrefix):
     :returns readProp: float Proportion of original fast5 files contained in eventalign
     """
 
-    # check how many files we have to begin with
-    filenames = selectBestReads(reads, options.dataFraction, options.numReads, options.selectMode, options.threads, options.readLength)
-
     fastaFile = '{}.fasta'.format(outPrefix)
-    # build fasta using poretools so we have index to fast5 files
-    if True:
-        try:
-            # GNU parallel
-            poretools = callPopen(('parallel -j16 -X {} fasta '
-                    '--type fwd {}').format(__exe__['poretools'], "{}").split(), force=options.force, stdin=subprocess.PIPE, stdout=fastaFile)
+    if not preventOverwrite(fastaFile, options.force):
+        filenames = selectBestReads(reads, options.dataFraction, options.numReads, options.selectMode, options.threads, options.readLength)
+        # build fasta using poretools so we have index to fast5 files
+        if True:
+            try:
+                # GNU parallel
+                poretools = callPopen(('parallel -j16 -X {} fasta '
+                        '--type fwd {}').format(__exe__['poretools'], "{}").split(), force=options.force, stdin=subprocess.PIPE, stdout=fastaFile)
+                poretools.communicate(input='\n'.join(filenames))
+                poretools.wait()
+            except Exception:
+                raise
+                # something went wrong - are we missing parallel?
+                # use our custom multiprocessing script
+                multithreadPoretools(__exe__['poretools'], options.tempDir, options.force, filenames, fastaFile, options.readLength)
+        else:
+            # single threaded poretools - slow
+            poretools = callPopen(('{} fasta --type fwd').format(__exe__['poretools']), options.force, stdout=fastaFile)
             poretools.communicate(input='\n'.join(filenames))
             poretools.wait()
-        except Exception:
-            raise
-            # something went wrong - are we missing paralle?
-            # use our custom multiprocessing script
-            multithreadPoretools(__exe__['poretools'], options.tempDir, options.force, filenames, fastaFile, options.readLength)
-    else:
-        # single threaded poretools - slow
-        poretools = callPopen(('{} fasta --type fwd').format(__exe__['poretools']), options.force, stdout=fastaFile)
-        poretools.communicate(input='\n'.join(filenames))
-        poretools.wait()
-
-    # index genome using bwa
-    callSubProcess('{} index {}'.format(__exe__['bwa'], options.genome),
-            options.force, newFile="{}.bwt".format(options.genome))
 
     # build sorted bam file using bwa mem
     sortedBamFile = buildSortedBam(options.threads, options.genome, fastaFile, outPrefix, options.force, options.mappingQuality)
     mappedCount = bamReadCount(sortedBamFile)
-    logging.debug("Mapped {} of {} reads.".format(mappedCount, len(filenames)))
+    logging.debug("Mapped {} reads.".format(mappedCount))
 
     # run nanopolish eventalign
     eventalignFile = "{}.eventalign".format(outPrefix)
