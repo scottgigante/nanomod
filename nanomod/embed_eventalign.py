@@ -160,7 +160,11 @@ def processEventalignWorker(options, eventalign, refs, idx, start, stop, genome,
 
     with open(eventalign, 'r') as tsv:
         reader = csv.reader(tsv, delimiter="\t")
-        reader.next() # headers
+        try:
+            reader.next() # headers
+        except StopIteration:
+            logging.warning("{} file empty - check nanopolish for errors".format(eventalign))
+            return []
         current_read_name = ""
         skip=True
         started=False if start > 0 else True
@@ -263,10 +267,10 @@ def processEventalignWorker(options, eventalign, refs, idx, start, stop, genome,
 
             # check strand direction
             if forward is None:
-                if int(line[idx['event_index']]) == initial_ref_index:
+                if int(line[idx['event_index']]) == initial_event_index:
                     continue
                 else:
-                    forward = initial_ref_index < int(line[idx['event_index']])
+                    forward = initial_event_index < int(line[idx['event_index']])
             current_ref_index = int(line[idx['ref_pos']])
 
             # generate seq pos
@@ -329,7 +333,12 @@ def processEventalign(options, eventalign, refs, genome, modified, alphabet):
 
         # open file
         reader = csv.reader(tsv, delimiter="\t")
-        headers = reader.next()
+        try:
+            headers = reader.next()
+        except StopIteration:
+            # file empty!
+            logging.warning("{} file empty - check nanopolish for errors".format(eventalign))
+            return []
         idx={}
         idx['contig'] = headers.index("contig")
         idx['ref_pos'] = headers.index("position")
